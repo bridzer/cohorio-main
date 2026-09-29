@@ -1,0 +1,20 @@
+{
+  "name": "cohorio",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/dashboard"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=cohorio-dashboard",
+    "start": "npm run start --workspace=cohorio-dashboard",
+    "lint": "npm run lint --workspace=cohorio-dashboard",
+    "test": "npm run test --workspace=cohorio-dashboard",
+    "db:migrate": "npm run db:migrate --workspace=cohorio-dashboard",
+    "auth:cleanup": "npm run auth:cleanup --workspace=cohorio-dashboard",
+    "auth:test-flow": "npm run auth:test-flow --workspace=cohorio-dashboard"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}

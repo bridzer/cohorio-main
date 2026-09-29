@@ -1,0 +1,14 @@
+ALTER TABLE shopify_products
+  ADD COLUMN IF NOT EXISTS vendor TEXT,
+  ADD COLUMN IF NOT EXISTS description_text TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS seo_title TEXT,
+  ADD COLUMN IF NOT EXISTS seo_description TEXT,
+  ADD COLUMN IF NOT EXISTS tags JSONB NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS media_count INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS variants_count INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS online_store_url TEXT,
+  ADD COLUMN IF NOT EXISTS cro_score INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS cro_recommendations JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+CREATE INDEX IF NOT EXISTS shopify_products_cro_score_idx
+  ON shopify_products (connection_id, cro_score ASC);

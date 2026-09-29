@@ -1,0 +1,247 @@
+.settings-shell,
+.settings-loading {
+  min-height: 100vh;
+  background: #f7f8f4;
+  color: #17221c;
+}
+
+.settings-loading {
+  display: grid;
+  place-items: center;
+  color: #6b746d;
+  font-size: 11px;
+}
+
+.settings-header {
+  display: flex;
+  min-height: 66px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e1e5df;
+  background: #fcfdfb;
+  padding: 0 34px;
+}
+
+.settings-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.settings-brand span {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  place-items: center;
+  border-radius: 9px;
+  background: #234d3e;
+  color: #dff19d;
+}
+
+.settings-back {
+  color: #4a6555;
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.settings-wrap {
+  width: min(820px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 52px 0 70px;
+}
+
+.settings-heading {
+  margin-bottom: 28px;
+}
+
+.settings-heading > span {
+  color: #6a875f;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.settings-heading h1 {
+  margin: 8px 0 8px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 40px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+
+.settings-heading p,
+.settings-card > div:first-child p {
+  margin: 0;
+  color: #6c756e;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.settings-card {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 30px;
+  margin-bottom: 14px;
+  border: 1px solid #e0e4de;
+  border-radius: 12px;
+  background: #fff;
+  padding: 22px;
+}
+
+.settings-card h2 {
+  margin: 0 0 5px;
+  font-size: 13px;
+}
+
+.settings-card form:not(.settings-inline-form) {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+
+.settings-card label {
+  flex: 1;
+  color: #435047;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.settings-card input,
+.settings-card select {
+  box-sizing: border-box;
+  min-height: 38px;
+  border: 1px solid #dce1db;
+  border-radius: 8px;
+  outline: none;
+  background: #fff;
+  padding: 0 11px;
+  color: #26332b;
+  font: inherit;
+  font-size: 10px;
+}
+
+.settings-card label input {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.settings-card button {
+  min-height: 38px;
+  border: 1px solid #d9dfd8;
+  border-radius: 8px;
+  background: #fff;
+  color: #365044;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.settings-card button:disabled {
+  opacity: 0.5;
+}
+
+.settings-list {
+  display: grid;
+  gap: 7px;
+}
+
+.settings-row {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  border-bottom: 1px solid #edf0ec;
+  padding: 3px 0 9px;
+}
+
+.settings-row span,
+.settings-row strong,
+.settings-row small {
+  display: block;
+}
+
+.settings-row strong {
+  font-size: 10px;
+}
+
+.settings-row small {
+  margin-top: 3px;
+  color: #818982;
+  font-size: 8px;
+}
+
+.settings-row em {
+  border-radius: 99px;
+  background: #edf4e8;
+  padding: 5px 8px;
+  color: #4d6a50;
+  font-size: 8px;
+  font-style: normal;
+  text-transform: capitalize;
+}
+
+.settings-inline-form {
+  display: grid;
+  grid-column: 2;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.settings-inline-form.invite {
+  grid-template-columns: 1fr 100px auto;
+}
+
+.settings-error,
+.settings-notice {
+  margin: 0 0 14px;
+  border-radius: 8px;
+  padding: 11px 13px;
+  font-size: 10px;
+}
+
+.settings-error {
+  background: #fce9e7;
+  color: #973f36;
+}
+
+.settings-notice {
+  overflow-wrap: anywhere;
+  background: #edf5e5;
+  color: #43664a;
+}
+
+.settings-card.danger {
+  border-color: #eadbd8;
+}
+
+.settings-security-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 650px) {
+  .settings-card {
+    display: block;
+  }
+
+  .settings-card > div:first-child {
+    margin-bottom: 18px;
+  }
+
+  .settings-inline-form,
+  .settings-inline-form.invite {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}

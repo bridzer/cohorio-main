@@ -1,0 +1,70 @@
+{
+  "name": "marketingskills",
+  "owner": {
+    "name": "Corey Haines",
+    "url": "https://corey.co"
+  },
+  "metadata": {
+    "description": "Marketing skills for AI agents — conversion optimization, copywriting, SEO, paid ads, and growth",
+    "version": "1.10.0",
+    "repository": "https://github.com/coreyhaines31/marketingskills"
+  },
+  "plugins": [
+    {
+      "name": "marketing-skills",
+      "description": "49 marketing skills for technical marketers and founders: ASO, CRO, copywriting, cold email, SEO, AI SEO, paid ads, ad creative, video production, image generation, co-marketing, churn prevention, pricing strategy, referral programs, revenue operations, sales enablement, customer research, site architecture, and more",
+      "source": "./",
+      "skills": [
+        "./skills/ab-testing",
+        "./skills/ad-creative",
+        "./skills/ads",
+        "./skills/ai-seo",
+        "./skills/analytics",
+        "./skills/aso",
+        "./skills/attribution",
+        "./skills/churn-prevention",
+        "./skills/co-marketing",
+        "./skills/cold-email",
+        "./skills/community-marketing",
+        "./skills/competitor-profiling",
+        "./skills/competitors",
+        "./skills/content-strategy",
+        "./skills/copy-editing",
+        "./skills/copywriting",
+        "./skills/cro",
+        "./skills/customer-research",
+        "./skills/directory-submissions",
+        "./skills/emails",
+        "./skills/free-tools",
+        "./skills/image",
+        "./skills/influencer-marketing",
+        "./skills/launch",
+        "./skills/lead-magnets",
+        "./skills/marketing-council",
+        "./skills/marketing-ideas",
+        "./skills/marketing-loops",
+        "./skills/marketing-plan",
+        "./skills/marketing-psychology",
+        "./skills/offers",
+        "./skills/onboarding",
+        "./skills/paywalls",
+        "./skills/popups",
+        "./skills/pricing",
+        "./skills/product-marketing",
+        "./skills/programmatic-seo",
+        "./skills/prospecting",
+        "./skills/public-relations",
+        "./skills/referrals",
+        "./skills/revops",
+        "./skills/sales-enablement",
+        "./skills/schema",
+        "./skills/seo-audit",
+        "./skills/signup",
+        "./skills/site-architecture",
+        "./skills/sms",
+        "./skills/social",
+        "./skills/video"
+      ]
+    }
+  ]
+}
