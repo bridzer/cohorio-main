@@ -3,14 +3,13 @@ import { auth } from "@/auth";
 import { resolveWorkspaceAccess } from "@/lib/access-control";
 import { encryptSecret } from "@/lib/secret-box";
 import {
+  assertRequiredShopifyScopes,
   exchangeAuthorizationCode,
   expandShopifyScopes,
   fetchGrantedShopifyScopes,
   fetchShopSummaryWithToken,
-  missingShopifyScopes,
   normalizeShopDomain,
   parseShopifyScopes,
-  REQUIRED_SHOPIFY_SCOPES,
   shopifyConfig,
   verifyShopifyQueryHmac,
 } from "@/lib/shopify/client";
@@ -65,6 +64,11 @@ export async function GET(request: NextRequest) {
     }
 
     const shopDomain = normalizeShopDomain(params.get("shop") ?? "");
+    if (shopDomain !== state.shopDomain) {
+      throw new Error(
+        "The shop in this callback does not match the store you started connecting.",
+      );
+    }
 
     const code = params.get("code");
     if (!code) throw new Error("Shopify did not return an authorization code.");
@@ -75,35 +79,16 @@ export async function GET(request: NextRequest) {
       shopDomain,
       tokens.access_token,
     );
-    let grantedScopes = expandShopifyScopes([
+    const grantedScopes = expandShopifyScopes([
       ...grantedFromToken,
       ...grantedFromApi,
     ]);
-    const missingRequired = missingShopifyScopes(
-      REQUIRED_SHOPIFY_SCOPES,
-      grantedScopes,
-    );
+    assertRequiredShopifyScopes(grantedScopes);
 
-    let summary;
-    try {
-      summary = await fetchShopSummaryWithToken(
-        shopDomain,
-        tokens.access_token,
-      );
-    } catch (error) {
-      if (missingRequired.length) {
-        throw new Error(
-          `Required Shopify permissions were not granted: ${missingRequired.join(", ")}. Enable them in the Shopify app API access settings, then reconnect.`,
-        );
-      }
-      throw error;
-    }
-    if (missingRequired.length) {
-      grantedScopes = expandShopifyScopes([
-        ...grantedScopes,
-        ...REQUIRED_SHOPIFY_SCOPES,
-      ]);
-    }
+    const summary = await fetchShopSummaryWithToken(
+      shopDomain,
+      tokens.access_token,
+    );
     const now = Date.now();
     const connection = await upsertConnection({
       workspaceId: state.workspaceId,

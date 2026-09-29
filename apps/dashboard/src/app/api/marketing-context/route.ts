@@ -14,6 +14,10 @@ import {
   accessErrorResponse,
   requireWorkspaceAccess,
 } from "@/lib/access-control";
+import {
+  assertSameOrigin,
+  originErrorResponse,
+} from "@/lib/auth/request";
 
 export const runtime = "nodejs";
 
@@ -62,9 +66,12 @@ export async function PUT(request: NextRequest) {
   let workspaceId = "";
   let payload: unknown;
   try {
+    assertSameOrigin(request);
     workspaceId = (await requireWorkspaceAccess("member")).workspaceId;
     payload = await request.json();
   } catch (error) {
+    const originResponse = originErrorResponse(error);
+    if (originResponse) return originResponse;
     const accessResponse = accessErrorResponse(error);
     if (accessResponse) return accessResponse;
     return errorResponse("Request body must be valid JSON.", 400);

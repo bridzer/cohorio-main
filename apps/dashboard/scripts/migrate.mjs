@@ -4,6 +4,7 @@ import path from "node:path";
 import process from "node:process";
 import nextEnv from "@next/env";
 import pg from "pg";
+import { postgresSslConfig } from "./postgres-ssl.mjs";
 
 const { Pool } = pg;
 nextEnv.loadEnvConfig(process.cwd());
@@ -16,10 +17,9 @@ if (!databaseUrl) {
 
 const migrationsDirectory = path.join(process.cwd(), "database", "migrations");
 const parsedUrl = new URL(databaseUrl);
-const sslEnabled = process.env.DATABASE_SSL === "true";
 const pool = new Pool({
   connectionString: databaseUrl,
-  ssl: sslEnabled ? { rejectUnauthorized: false } : undefined,
+  ssl: postgresSslConfig(),
 });
 
 function normalizeSql(sql) {

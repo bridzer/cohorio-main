@@ -1,5 +1,6 @@
 import nextEnv from "@next/env";
 import pg from "pg";
+import { postgresSslConfig } from "./postgres-ssl.mjs";
 
 nextEnv.loadEnvConfig(process.cwd());
 
@@ -8,10 +9,7 @@ const email = `verification-test-${Date.now()}@example.com`;
 const password = "VerificationTest123";
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl:
-    process.env.DATABASE_SSL === "true"
-      ? { rejectUnauthorized: false }
-      : undefined,
+  ssl: postgresSslConfig(),
 });
 
 async function cleanup() {

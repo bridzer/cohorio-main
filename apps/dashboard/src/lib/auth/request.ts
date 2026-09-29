@@ -25,3 +25,13 @@ export function assertSameOrigin(request: NextRequest) {
     throw new Error("INVALID_ORIGIN");
   }
 }
+
+export function originErrorResponse(error: unknown) {
+  if (error instanceof Error && error.message === "INVALID_ORIGIN") {
+    return Response.json(
+      { error: "Invalid request origin." },
+      { status: 403 },
+    );
+  }
+  return null;
+}

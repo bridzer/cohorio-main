@@ -4,6 +4,15 @@ declare global {
   var __cohorioPostgresPool: Pool | undefined;
 }
 
+export function postgresSslConfig(
+  env: NodeJS.ProcessEnv = process.env,
+): { rejectUnauthorized: boolean } | undefined {
+  if (env.DATABASE_SSL !== "true") return undefined;
+  return {
+    rejectUnauthorized: env.DATABASE_SSL_REJECT_UNAUTHORIZED !== "false",
+  };
+}
+
 function createPool() {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
@@ -17,10 +26,7 @@ function createPool() {
     max: 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
-    ssl:
-      process.env.DATABASE_SSL === "true"
-        ? { rejectUnauthorized: false }
-        : undefined,
+    ssl: postgresSslConfig(),
   });
 }
 

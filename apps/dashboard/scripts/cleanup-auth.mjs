@@ -1,5 +1,6 @@
 import nextEnv from "@next/env";
 import pg from "pg";
+import { postgresSslConfig } from "./postgres-ssl.mjs";
 
 nextEnv.loadEnvConfig(process.cwd());
 if (!process.env.DATABASE_URL) {
@@ -8,10 +9,7 @@ if (!process.env.DATABASE_URL) {
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl:
-    process.env.DATABASE_SSL === "true"
-      ? { rejectUnauthorized: false }
-      : undefined,
+  ssl: postgresSslConfig(),
 });
 
 try {

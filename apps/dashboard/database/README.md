@@ -42,8 +42,10 @@ users ──< organization_memberships >── organizations ──< workspaces
 ## Operational requirements
 
 - PostgreSQL 14+ with the `pgcrypto` and `citext` extensions available.
-- TLS should be enabled when required by the provider. Keep certificate
-  verification enabled unless a provider explicitly requires otherwise.
+- TLS should be enabled when required by the provider (`DATABASE_SSL=true`).
+  Certificate verification stays on unless you set
+  `DATABASE_SSL_REJECT_UNAUTHORIZED=false` for a provider that cannot present a
+  publicly trusted certificate.
 - Back up a populated database before migration and run integration tests
   against a staging clone before production schema changes.
 - Audit events use a BRIN index on `created_at`. Apply a retention window

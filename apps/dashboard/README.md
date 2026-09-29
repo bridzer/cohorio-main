@@ -34,6 +34,9 @@ update.
 
 For local OAuth, `APP_URL` must be an HTTPS URL reachable by Shopify. Use an
 HTTPS tunnel and update the app and redirect URLs in Shopify's dashboard.
+`SHOPIFY_CLIENT_SECRET` is the Dev Dashboard client secret, not a store access
+token. Connecting a store starts with a same-origin POST so a crafted GET link
+cannot attach a shop to the signed-in workspace.
 
 ## Security boundary
 

@@ -7,6 +7,7 @@ import {
   activateOAuthUser,
   consumeSessionBootstrapToken,
   getCredentialUser,
+  getUserByAccount,
   getUserByEmail,
   getUserById,
   recordLoginFailure,
@@ -93,7 +94,6 @@ if (googleClientId && googleClientSecret) {
     Google({
       clientId: googleClientId,
       clientSecret: googleClientSecret,
-      allowDangerousEmailAccountLinking: true,
       authorization: { params: { scope: "openid email profile" } },
     }),
   );
@@ -120,6 +120,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         Boolean(profile.email_verified);
       if (!user.email || !emailVerified) return "/sign-in?error=Verification";
       const existing = await getUserByEmail(user.email);
+      const linkedGoogle = account.providerAccountId
+        ? await getUserByAccount("google", account.providerAccountId)
+        : null;
+      if (
+        existing &&
+        !linkedGoogle &&
+        (await getCredentialUser(user.email))
+      ) {
+        return "/sign-in?error=OAuthAccountNotLinked";
+      }
       const candidate = user.id ? await getUserById(user.id) : existing;
       if (
         candidate?.status === "suspended" ||

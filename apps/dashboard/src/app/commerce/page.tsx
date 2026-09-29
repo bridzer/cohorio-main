@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import { accountInitials, useAccount } from "@/lib/use-account";
+import { startShopifyOAuth } from "@/lib/shopify/start-oauth";
 import AdCampaignBuilder from "./AdCampaignBuilder";
 import ProductCroWorkspace from "./ProductCroWorkspace";
 import "./commerce.css";
@@ -253,7 +253,6 @@ function BrandMark() {
 }
 
 export default function CommerceSuite() {
-  const router = useRouter();
   const account = useAccount();
   const userFirstName =
     account?.user.name?.trim().split(/\s+/)[0] || "there";
@@ -573,12 +572,19 @@ export default function CommerceSuite() {
     );
   }
 
-  function connectStore(event: FormEvent<HTMLFormElement>) {
+  async function connectStore(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!shopDomain.trim()) return;
-    router.push(
-      `/api/shopify/oauth/start?shop=${encodeURIComponent(shopDomain.trim())}`,
-    );
+    setConnectionMessage("");
+    try {
+      await startShopifyOAuth(shopDomain.trim());
+    } catch (error) {
+      setConnectionMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to connect this store.",
+      );
+    }
   }
 
   async function syncStore() {

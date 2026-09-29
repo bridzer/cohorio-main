@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Pool, type PoolClient } from "pg";
 import { loadEnvConfig } from "@next/env";
+import { postgresSslConfig } from "../database";
 
 loadEnvConfig(process.cwd(), false, console, true);
 
@@ -24,10 +25,7 @@ integration("authentication tenancy database", () => {
   beforeAll(async () => {
     pool = new Pool({
       connectionString,
-      ssl:
-        process.env.DATABASE_SSL === "true"
-          ? { rejectUnauthorized: false }
-          : undefined,
+      ssl: postgresSslConfig(),
     });
     client = await pool.connect();
     await client.query("BEGIN");

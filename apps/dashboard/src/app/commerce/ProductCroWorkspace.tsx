@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { startShopifyOAuth } from "@/lib/shopify/start-oauth";
 
 type Recommendation = {
   area: string;
@@ -698,11 +699,20 @@ export default function ProductCroWorkspace({
               <div className="commerce-cro-implementation-error">
                 {implementationError}
                 {reauthorizationRequired && shopDomain && (
-                  <a
-                    href={`/api/shopify/oauth/start?shop=${encodeURIComponent(shopDomain)}`}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void startShopifyOAuth(shopDomain).catch((reason) => {
+                        setImplementationError(
+                          reason instanceof Error
+                            ? reason.message
+                            : "Unable to reconnect Shopify.",
+                        );
+                      });
+                    }}
                   >
                     Reconnect Shopify
-                  </a>
+                  </button>
                 )}
               </div>
             )}

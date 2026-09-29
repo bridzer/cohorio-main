@@ -19,6 +19,10 @@ import {
   missingShopifyScopes,
   parseShopifyScopes,
 } from "./scopes";
+import {
+  assertShopifyAppUrl,
+  assertShopifyClientSecret,
+} from "./install";
 
 export {
   expandShopifyScopes,
@@ -26,14 +30,19 @@ export {
   parseShopifyScopes,
 } from "./scopes";
 
+export {
+  assertRequiredShopifyScopes,
+  assertShopifyAppUrl,
+  assertShopifyClientSecret,
+  REQUIRED_SHOPIFY_SCOPES,
+} from "./install";
+
 export const SHOPIFY_API_VERSION =
   process.env.SHOPIFY_API_VERSION ?? "2026-07";
 
 const configuredShopifyScopes =
   process.env.SHOPIFY_SCOPES ??
   "read_products,write_products,read_inventory,read_orders,read_customers,read_analytics,read_reports";
-
-export const REQUIRED_SHOPIFY_SCOPES = ["read_products"];
 
 export const SHOPIFY_SCOPES = parseShopifyScopes(
   `${configuredShopifyScopes},read_products,write_products`,
@@ -69,6 +78,8 @@ export function shopifyConfig() {
       "SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET, and APP_URL are required.",
     );
   }
+  assertShopifyClientSecret(clientSecret);
+  assertShopifyAppUrl(appUrl);
 
   return {
     clientId,
