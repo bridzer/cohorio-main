@@ -3,15 +3,15 @@ import { postgresSslConfig } from "./database";
 
 describe("postgres TLS", () => {
   it("leaves SSL off unless DATABASE_SSL=true", () => {
-    expect(postgresSslConfig({} as NodeJS.ProcessEnv)).toBeUndefined();
+    expect(postgresSslConfig({} as unknown as NodeJS.ProcessEnv)).toBeUndefined();
     expect(
-      postgresSslConfig({ DATABASE_SSL: "false" } as NodeJS.ProcessEnv),
+      postgresSslConfig({ DATABASE_SSL: "false" } as unknown as NodeJS.ProcessEnv),
     ).toBeUndefined();
   });
 
   it("verifies certificates when TLS is enabled", () => {
     expect(
-      postgresSslConfig({ DATABASE_SSL: "true" } as NodeJS.ProcessEnv),
+      postgresSslConfig({ DATABASE_SSL: "true" } as unknown as NodeJS.ProcessEnv),
     ).toEqual({ rejectUnauthorized: true });
   });
 
@@ -20,7 +20,7 @@ describe("postgres TLS", () => {
       postgresSslConfig({
         DATABASE_SSL: "true",
         DATABASE_SSL_REJECT_UNAUTHORIZED: "false",
-      } as NodeJS.ProcessEnv),
+      } as unknown as NodeJS.ProcessEnv),
     ).toEqual({ rejectUnauthorized: false });
   });
 });
