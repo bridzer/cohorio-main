@@ -17,9 +17,10 @@ if (!databaseUrl) {
 
 const migrationsDirectory = path.join(process.cwd(), "database", "migrations");
 const parsedUrl = new URL(databaseUrl);
+const sslConfig = postgresSslConfig();
 const pool = new Pool({
   connectionString: databaseUrl,
-  ssl: postgresSslConfig(),
+  ssl: sslConfig,
 });
 
 function normalizeSql(sql) {
@@ -66,7 +67,7 @@ try {
   `);
   const info = preflight.rows[0];
   console.log(
-    `Migrating ${info.database} on ${parsedUrl.hostname}:${parsedUrl.port || "5432"} (PostgreSQL ${info.version}, ssl=${sslEnabled})`,
+    `Migrating ${info.database} on ${parsedUrl.hostname}:${parsedUrl.port || "5432"} (PostgreSQL ${info.version}, ssl=${Boolean(sslConfig)})`,
   );
   if (!info.pgcrypto || !info.citext) {
     throw new Error("PostgreSQL extensions pgcrypto and citext must be available.");
