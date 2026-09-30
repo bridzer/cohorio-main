@@ -34,9 +34,10 @@ update.
 
 For local OAuth, `APP_URL` must be an HTTPS URL reachable by Shopify. Use an
 HTTPS tunnel and update the app and redirect URLs in Shopify's dashboard.
-`SHOPIFY_CLIENT_SECRET` is the Dev Dashboard client secret, not a store access
-token. Connecting a store starts with a same-origin POST so a crafted GET link
-cannot attach a shop to the signed-in workspace.
+`SHOPIFY_CLIENT_SECRET` is the Dev Dashboard client secret (often `shpss_…`),
+not a store access token (`shpat_`). Connecting a store starts with a
+same-origin POST so a crafted GET link cannot attach a shop to the signed-in
+workspace.
 
 ## Security boundary
 
@@ -50,8 +51,10 @@ proxy) so auth rate limits use the last `X-Forwarded-For` hop. Leave it `false`
 for direct local access so clients cannot spoof `X-Forwarded-For`.
 
 `GET /api/shopify/connections` validates `SHOPIFY_CLIENT_SECRET` and HTTPS
-`APP_URL` through `shopifyConfig()`. A token-shaped secret or HTTP app URL
-returns `configured: false` and a `configError` string, never the secret value.
+`APP_URL` through `shopifyConfig()`. An Admin API token used as the client
+secret, or an HTTP app URL, returns `configured: false` and a `configError`
+string, never the secret value. Client secrets that start with `shpss_` are
+valid.
 
 Never expose Shopify tokens or `SHOPIFY_TOKEN_ENCRYPTION_KEY` to the browser.
 All Shopify API requests must remain in server routes or server jobs.

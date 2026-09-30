@@ -13,6 +13,12 @@ describe("Shopify install configuration", () => {
     expect(() => assertShopifyClientSecret("shpua_not-a-client-secret")).toThrow(
       /Client secret/,
     );
+    expect(() => assertShopifyClientSecret("shpca_not-a-client-secret")).toThrow(
+      /Client secret/,
+    );
+    expect(() =>
+      assertShopifyClientSecret("shpss_client-secret-from-dashboard"),
+    ).not.toThrow();
     expect(() => assertShopifyClientSecret("shop_secret_from_dashboard")).not.toThrow();
   });
 

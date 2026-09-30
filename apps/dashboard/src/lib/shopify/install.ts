@@ -12,7 +12,7 @@ export function assertRequiredShopifyScopes(granted: string[]) {
 }
 
 export function assertShopifyClientSecret(clientSecret: string) {
-  if (/^shp(at|ua|ca|ss)_/i.test(clientSecret.trim())) {
+  if (/^shp(at|ua|ca|pa)_/i.test(clientSecret.trim())) {
     throw new Error(
       "SHOPIFY_CLIENT_SECRET must be the Client secret from the Shopify Dev Dashboard, not an Admin API access token.",
     );
