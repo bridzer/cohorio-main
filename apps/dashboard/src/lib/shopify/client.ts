@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { decryptSecret, encryptSecret } from "@/lib/secret-box";
+import { workspaceContextMarkdown } from "@/lib/marketing-context-prompt";
 import {
   getConnectionWithSecretsForWorkspace,
   updateConnectionTokens,
@@ -648,6 +649,7 @@ export async function fetchShopifyOverview(
   connectionId: string,
   workspaceId: string,
 ): Promise<ShopifyOverviewSync> {
+  const brandContextMarkdown = await workspaceContextMarkdown(workspaceId);
   const dailyMetrics = await fetchDailyNetSales(connectionId, workspaceId);
   const products: ShopifyProductSnapshot[] = [];
   let productsCursor: string | null = null;
@@ -665,21 +667,24 @@ export async function fetchShopifyOverview(
       const minimumPrice = numberFromShopify(
         product.priceRangeV2.minVariantPrice.amount,
       );
-      const cro = analyzeProductCro({
-        title: product.title,
-        descriptionText: product.description,
-        vendor: product.vendor || null,
-        productType: product.productType || null,
-        tags: product.tags,
-        mediaCount: product.mediaCount?.count ?? 0,
-        variantsCount: product.variantsCount?.count ?? 0,
-        seoTitle: product.seo.title,
-        seoDescription: product.seo.description,
-        onlineStoreUrl: product.onlineStoreUrl,
-        status: product.status.toUpperCase(),
-        totalInventory: product.totalInventory ?? 0,
-        minimumPrice,
-      });
+      const cro = analyzeProductCro(
+        {
+          title: product.title,
+          descriptionText: product.description,
+          vendor: product.vendor || null,
+          productType: product.productType || null,
+          tags: product.tags,
+          mediaCount: product.mediaCount?.count ?? 0,
+          variantsCount: product.variantsCount?.count ?? 0,
+          seoTitle: product.seo.title,
+          seoDescription: product.seo.description,
+          onlineStoreUrl: product.onlineStoreUrl,
+          status: product.status.toUpperCase(),
+          totalInventory: product.totalInventory ?? 0,
+          minimumPrice,
+        },
+        brandContextMarkdown,
+      );
       products.push({
         shopifyProductId: product.id,
         title: product.title,

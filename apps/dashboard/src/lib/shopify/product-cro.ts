@@ -1,3 +1,8 @@
+import {
+  markdownFieldValue,
+  markdownSectionHasProvidedValues,
+} from "../marketing-context";
+
 export type ProductCroInput = {
   title: string;
   descriptionText: string;
@@ -40,8 +45,19 @@ function priority(pointsAvailable: number) {
   return "low";
 }
 
+function sharesTwelveCharacterWindow(description: string, oneLiner: string) {
+  const haystack = description.toLowerCase();
+  const needle = oneLiner.toLowerCase();
+  if (needle.length < 12) return false;
+  for (let index = 0; index <= needle.length - 12; index += 1) {
+    if (haystack.includes(needle.slice(index, index + 12))) return true;
+  }
+  return false;
+}
+
 export function analyzeProductCro(
   product: ProductCroInput,
+  brandContextMarkdown = "",
 ): ProductCroAnalysis {
   let score = 0;
   const recommendations: ProductCroRecommendation[] = [];
@@ -207,6 +223,34 @@ export function analyzeProductCro(
   }
 
   const normalizedScore = Math.max(0, Math.min(100, score));
+  const rankedRecommendations = recommendations
+    .sort((left, right) => right.pointsAvailable - left.pointsAvailable)
+    .slice(0, 6);
+
+  const oneLiner = markdownFieldValue(
+    brandContextMarkdown,
+    "Product overview",
+    "One-line description",
+  );
+  const hasVoice = markdownSectionHasProvidedValues(
+    brandContextMarkdown,
+    "Brand voice",
+  );
+  if (
+    (oneLiner || hasVoice) &&
+    !sharesTwelveCharacterWindow(product.descriptionText, oneLiner)
+  ) {
+    rankedRecommendations.push({
+      area: "Value proposition",
+      title: "Reflect Brand Brain on the product page",
+      detail: oneLiner
+        ? `The live description does not share the Brand Brain one-liner. Lead with "${oneLiner}" so shoppers and generated campaigns hear the same offer.`
+        : "The product page does not yet reflect the Brand Brain voice. Rewrite the description so it matches how the brand should sound.",
+      pointsAvailable: 8,
+      priority: "high",
+    });
+  }
+
   return {
     score: normalizedScore,
     grade:
@@ -215,8 +259,6 @@ export function analyzeProductCro(
         : normalizedScore >= 60
           ? "fair"
           : "needs-work",
-    recommendations: recommendations
-      .sort((left, right) => right.pointsAvailable - left.pointsAvailable)
-      .slice(0, 6),
+    recommendations: rankedRecommendations,
   };
 }

@@ -1,6 +1,9 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import nextEnv from "@next/env";
 import { defineConfig } from "vitest/config";
 
+const root = path.dirname(fileURLToPath(import.meta.url));
 const { combinedEnv } = nextEnv.loadEnvConfig(
   process.cwd(),
   false,
@@ -9,6 +12,11 @@ const { combinedEnv } = nextEnv.loadEnvConfig(
 );
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@": path.join(root, "src"),
+    },
+  },
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],

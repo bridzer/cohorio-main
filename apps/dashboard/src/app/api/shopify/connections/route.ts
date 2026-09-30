@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { listConnections } from "@/lib/shopify/repository";
+import { shopifyConfig } from "@/lib/shopify/client";
 import {
   accessErrorResponse,
   requireWorkspaceAccess,
@@ -8,27 +9,38 @@ import {
 export const runtime = "nodejs";
 
 export async function GET() {
-  const configured = Boolean(
-    process.env.DATABASE_URL &&
-      process.env.SHOPIFY_CLIENT_ID &&
-      process.env.SHOPIFY_CLIENT_SECRET &&
-      process.env.SHOPIFY_TOKEN_ENCRYPTION_KEY &&
-      process.env.APP_URL,
-  );
-
   try {
     const access = await requireWorkspaceAccess("viewer");
-    const connections = configured
-      ? await listConnections(access.workspaceId)
-      : [];
-    return NextResponse.json({ configured, connections });
+    try {
+      shopifyConfig();
+    } catch (error) {
+      const configError =
+        error instanceof Error
+          ? error.message
+          : "Shopify is not configured.";
+      return NextResponse.json({
+        configured: false,
+        connections: [],
+        configError,
+      });
+    }
+    if (!process.env.SHOPIFY_TOKEN_ENCRYPTION_KEY) {
+      return NextResponse.json({
+        configured: false,
+        connections: [],
+        configError:
+          "SHOPIFY_TOKEN_ENCRYPTION_KEY is required to store Shopify tokens.",
+      });
+    }
+    const connections = await listConnections(access.workspaceId);
+    return NextResponse.json({ configured: true, connections });
   } catch (error) {
     const accessResponse = accessErrorResponse(error);
     if (accessResponse) return accessResponse;
     const message =
       error instanceof Error ? error.message : "Unable to load Shopify stores.";
     return NextResponse.json(
-      { configured, connections: [], error: message },
+      { configured: false, connections: [], error: message },
       { status: 503 },
     );
   }

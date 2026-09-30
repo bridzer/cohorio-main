@@ -224,27 +224,6 @@ const tasks: {
   },
 ];
 
-const activity = [
-  {
-    title: "LinkedIn launch sequence",
-    type: "Social content",
-    time: "18 min ago",
-    status: "Ready",
-  },
-  {
-    title: "Q3 demand-gen angles",
-    type: "Ad creative",
-    time: "Yesterday",
-    status: "Draft",
-  },
-  {
-    title: "Homepage positioning audit",
-    type: "CRO report",
-    time: "Aug 9",
-    status: "Ready",
-  },
-];
-
 type DashboardAccount = {
   user: { name?: string | null; email?: string | null };
   access: {
@@ -264,6 +243,7 @@ export default function Home() {
   const [assistantMessage, setAssistantMessage] = useState(
     "What are we working on today?",
   );
+  const [todayLabel, setTodayLabel] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -303,6 +283,16 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    setTodayLabel(
+      new Intl.DateTimeFormat("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      }).format(new Date()),
+    );
+  }, []);
+
   const displayName = account?.user.name?.trim() || "there";
   const initials = displayName
     .split(/\s+/)
@@ -315,6 +305,7 @@ export default function Home() {
       filter === "All" ? tasks : tasks.filter((task) => task.category === filter),
     [filter],
   );
+  const copilotRuns: { skill_id: string; created_at: string }[] = [];
 
   function submitPrompt(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -444,21 +435,81 @@ export default function Home() {
         </header>
 
         <div className="content-wrap">
+          {activeNav === "Assets" ? (
+            <section className="workspace-panel">
+              <div className="section-heading">
+                <div>
+                  <h2>Assets</h2>
+                  <p>Outputs from Ask Cohorio, with skill and time saved.</p>
+                </div>
+              </div>
+              {copilotRuns.length === 0 ? (
+                <p className="activity-empty">No runs yet</p>
+              ) : (
+                <div className="activity-list">
+                  {copilotRuns.map((run) => (
+                    <div className="activity-row" key={`${run.skill_id}-${run.created_at}`}>
+                      <span className="activity-copy">
+                        <strong>{run.skill_id}</strong>
+                        <span>
+                          {new Intl.DateTimeFormat("en-US", {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          }).format(new Date(run.created_at))}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          ) : activeNav === "Performance" ? (
+            <section className="workspace-panel">
+              <div className="section-heading">
+                <div>
+                  <h2>Performance</h2>
+                  <p>
+                    Store revenue, orders, and product metrics live in Commerce.
+                  </p>
+                </div>
+              </div>
+              <button
+                className="manage-button"
+                onClick={() => router.push("/commerce")}
+              >
+                Open Commerce <Icon name="arrow" size={16} />
+              </button>
+            </section>
+          ) : activeNav === "Connections" ? (
+            <section className="workspace-panel">
+              <div className="section-heading">
+                <div>
+                  <h2>Connections</h2>
+                  <p>Shopify stores and team access for this workspace.</p>
+                </div>
+              </div>
+              <div className="connection-links">
+                <button
+                  className="manage-button"
+                  onClick={() => router.push("/commerce")}
+                >
+                  Shopify stores <Icon name="arrow" size={16} />
+                </button>
+                <button
+                  className="manage-button"
+                  onClick={() => router.push("/settings")}
+                >
+                  Team members <Icon name="arrow" size={16} />
+                </button>
+              </div>
+            </section>
+          ) : (
+            <>
           <section className="welcome-row">
             <div>
-              <p className="eyebrow">Wednesday, August 12</p>
+              <p className="eyebrow">{todayLabel}</p>
               <h1>Good morning, {displayName.split(/\s+/)[0]}.</h1>
               <p>Your marketing workspace is ready. What will you move forward today?</p>
-            </div>
-            <div className="usage-pill">
-              <div className="usage-ring">
-                <span>7</span>
-              </div>
-              <div>
-                <strong>7 of 50 tasks</strong>
-                <span>Renews Sep 1</span>
-              </div>
-              <Icon name="arrow" size={16} />
             </div>
           </section>
 
@@ -560,59 +611,56 @@ export default function Home() {
                   <h2>Recent work</h2>
                   <p>Pick up where you left off.</p>
                 </div>
-                <button>View all</button>
               </div>
-              <div className="activity-list">
-                {activity.map((item, index) => (
-                  <button key={item.title} className="activity-row">
-                    <span className={`file-tile file-${index + 1}`}>
-                      <span />
-                      <span />
-                      <span />
-                    </span>
-                    <span className="activity-copy">
-                      <strong>{item.title}</strong>
-                      <span>
-                        {item.type} · {item.time}
+              {copilotRuns.length === 0 ? (
+                <p className="activity-empty">No runs yet</p>
+              ) : (
+                <div className="activity-list">
+                  {copilotRuns.map((run) => (
+                    <div
+                      className="activity-row"
+                      key={`${run.skill_id}-${run.created_at}`}
+                    >
+                      <span className="activity-copy">
+                        <strong>{run.skill_id}</strong>
+                        <span>
+                          {new Intl.DateTimeFormat("en-US", {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          }).format(new Date(run.created_at))}
+                        </span>
                       </span>
-                    </span>
-                    <span className={`status ${item.status.toLowerCase()}`}>
-                      {item.status === "Ready" && <Icon name="check" size={13} />}
-                      {item.status}
-                    </span>
-                    <Icon name="arrow" size={16} />
-                  </button>
-                ))}
-              </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="connections-panel">
               <div className="panel-heading">
                 <div>
                   <h2>Connected stack</h2>
-                  <p>Bring performance into every decision.</p>
+                  <p>Shopify and team access for this workspace.</p>
                 </div>
               </div>
-              <div className="connection-icons">
-                <span className="connection ga">A</span>
-                <span className="connection stripe">S</span>
-                <span className="connection mailchimp">M</span>
-                <button className="add-connection" aria-label="Add connection">
-                  <Icon name="plus" size={19} />
+              <div className="connection-links">
+                <button
+                  className="manage-button"
+                  onClick={() => router.push("/commerce")}
+                >
+                  Shopify stores <Icon name="arrow" size={16} />
+                </button>
+                <button
+                  className="manage-button"
+                  onClick={() => router.push("/settings")}
+                >
+                  Team members <Icon name="arrow" size={16} />
                 </button>
               </div>
-              <div className="connection-summary">
-                <span className="pulse-dot" />
-                <p>
-                  <strong>3 sources are healthy</strong>
-                  Last synced 4 minutes ago
-                </p>
-              </div>
-              <button className="manage-button">
-                Manage connections <Icon name="arrow" size={16} />
-              </button>
             </div>
           </section>
+            </>
+          )}
         </div>
       </main>
     </div>

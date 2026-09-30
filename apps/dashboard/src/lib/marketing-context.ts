@@ -459,3 +459,56 @@ export function contextToMarkdown(
   }
   return lines.join("\n");
 }
+
+export function markdownSection(markdown: string, heading: string) {
+  const lines = markdown.split("\n");
+  const start = lines.findIndex((line) => line.trim() === `## ${heading}`);
+  if (start < 0) return "";
+  const end = lines.findIndex(
+    (line, index) => index > start && /^## /.test(line),
+  );
+  return lines
+    .slice(start + 1, end === -1 ? undefined : end)
+    .join("\n")
+    .trim();
+}
+
+export function markdownFieldValue(
+  markdown: string,
+  heading: string,
+  label: string,
+) {
+  const lines = markdownSection(markdown, heading).split("\n");
+  const labelIndex = lines.findIndex(
+    (line) => line.trim() === `**${label}:**`,
+  );
+  if (labelIndex < 0) return "";
+  for (let index = labelIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index]?.trim() ?? "";
+    if (!line) continue;
+    if (line.startsWith("**") && line.endsWith(":**")) return "";
+    if (line === "_Not provided_") return "";
+    return line;
+  }
+  return "";
+}
+
+export function markdownSectionHasProvidedValues(
+  markdown: string,
+  heading: string,
+) {
+  const section = markdownSection(markdown, heading);
+  if (!section || section.includes("*Not applicable*")) return false;
+  const lines = section.split("\n");
+  for (let index = 0; index < lines.length; index += 1) {
+    const headingLine = lines[index]?.trim() ?? "";
+    if (!/^\*\*.+:\*\*$/.test(headingLine)) continue;
+    for (let next = index + 1; next < lines.length; next += 1) {
+      const value = lines[next]?.trim() ?? "";
+      if (!value) continue;
+      if (value.startsWith("**") && value.endsWith(":**")) break;
+      return value !== "_Not provided_";
+    }
+  }
+  return false;
+}

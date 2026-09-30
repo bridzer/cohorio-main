@@ -11,11 +11,15 @@ import {
   updateAdCampaignStatus,
 } from "@/lib/shopify/campaign-repository";
 import { getConnectionForWorkspace } from "@/lib/shopify/repository";
+import { workspaceContextMarkdown } from "@/lib/marketing-context-prompt";
 import {
   accessErrorResponse,
   requireWorkspaceAccess,
 } from "@/lib/access-control";
-import { assertSameOrigin } from "@/lib/auth/request";
+import {
+  assertSameOrigin,
+  originErrorResponse,
+} from "@/lib/auth/request";
 
 export const runtime = "nodejs";
 
@@ -36,6 +40,8 @@ function text(
 }
 
 function errorResponse(error: unknown, fallback: string) {
+  const originResponse = originErrorResponse(error);
+  if (originResponse) return originResponse;
   const accessResponse = accessErrorResponse(error);
   if (accessResponse) return accessResponse;
   const message = error instanceof Error ? error.message : fallback;
@@ -154,7 +160,11 @@ export async function POST(
         text(body.offer ?? "", "Offer", 500, false) || null,
       landingPageUrl: landingPageUrl || null,
     };
-    const generated = generateAdCampaign(brief, products);
+    const generated = generateAdCampaign(
+      brief,
+      products,
+      await workspaceContextMarkdown(workspaceId),
+    );
     const campaign = await createAdCampaign({
       connectionId: id,
       workspaceId,

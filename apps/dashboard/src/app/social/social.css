@@ -665,6 +665,18 @@
   font-size: 7px;
 }
 
+.social-generate:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.social-generate-error {
+  margin: 10px 0 0;
+  color: #b42318;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .social-preview-panel {
   padding: 22px;
   background: #fcfdfb;

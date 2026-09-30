@@ -1,11 +1,20 @@
 import type { NextRequest } from "next/server";
 
-export function clientIp(request: NextRequest) {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown"
-  );
+export function clientIp(
+  request: NextRequest,
+  env: NodeJS.ProcessEnv = process.env,
+) {
+  if (env.AUTH_TRUST_PROXY !== "true") return "direct";
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const hops = forwarded
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    const peer = hops.at(-1);
+    if (peer) return peer;
+  }
+  return request.headers.get("x-real-ip")?.trim() || "unknown";
 }
 
 export function assertSameOrigin(request: NextRequest) {

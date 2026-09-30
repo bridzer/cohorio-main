@@ -207,40 +207,19 @@ function chartPath(values: number[], maximum: number) {
     .join(" ");
 }
 
-const initialFlows = [
-  {
-    name: "Welcome series",
-    trigger: "Newsletter signup",
-    messages: 5,
-    revenue: "$8,420",
-    status: true,
-    tone: "mint",
-  },
-  {
-    name: "Abandoned checkout",
-    trigger: "Checkout started",
-    messages: 3,
-    revenue: "$6,780",
-    status: true,
-    tone: "peach",
-  },
-  {
-    name: "Post-purchase",
-    trigger: "Order fulfilled",
-    messages: 4,
-    revenue: "$3,240",
-    status: true,
-    tone: "blue",
-  },
-  {
-    name: "Win-back",
-    trigger: "90 days inactive",
-    messages: 3,
-    revenue: "$0",
-    status: false,
-    tone: "violet",
-  },
-];
+function storeHealthScore(overview: StoreOverview) {
+  return Math.round(
+    overview.complete ? 100 : overview.metrics.products > 0 ? 50 : 0,
+  );
+}
+
+function storeHealthCopy(overview: StoreOverview) {
+  if (overview.complete) return "Shopify overview sync finished.";
+  if (overview.metrics.products > 0) {
+    return "Catalog loaded. Some overview fields are still incomplete.";
+  }
+  return "Sync this store to score health from catalog data.";
+}
 
 function BrandMark() {
   return (
@@ -257,7 +236,6 @@ export default function CommerceSuite() {
   const userFirstName =
     account?.user.name?.trim().split(/\s+/)[0] || "there";
   const [section, setSection] = useState<Section>("Overview");
-  const [flows, setFlows] = useState(initialFlows);
   const [applied, setApplied] = useState<number[]>([]);
   const [connections, setConnections] = useState<ShopifyConnection[]>([]);
   const [selectedConnectionId, setSelectedConnectionId] = useState("");
@@ -265,6 +243,7 @@ export default function CommerceSuite() {
   const [connectModalOpen, setConnectModalOpen] = useState(false);
   const [shopDomain, setShopDomain] = useState("");
   const [shopifyConfigured, setShopifyConfigured] = useState(true);
+  const [configError, setConfigError] = useState("");
   const [connectionLoading, setConnectionLoading] = useState(true);
   const [connectionMessage, setConnectionMessage] = useState("");
   const [syncing, setSyncing] = useState(false);
@@ -430,8 +409,10 @@ export default function CommerceSuite() {
         configured: boolean;
         connections: ShopifyConnection[];
         error?: string;
+        configError?: string;
       };
       setShopifyConfigured(payload.configured);
+      setConfigError(payload.configError ?? "");
       setConnections(payload.connections);
       setSelectedConnectionId(
         (current) => {
@@ -464,9 +445,11 @@ export default function CommerceSuite() {
           configured: boolean;
           connections: ShopifyConnection[];
           error?: string;
+          configError?: string;
         };
         if (cancelled) return;
         setShopifyConfigured(payload.configured);
+        setConfigError(payload.configError ?? "");
         setConnections(payload.connections);
         const savedConnection = window.localStorage.getItem(
           "cohorio_shopify_connection",
@@ -557,14 +540,6 @@ export default function CommerceSuite() {
       cancelled = true;
     };
   }, [selectedConnectionId]);
-
-  function toggleFlow(index: number) {
-    setFlows((current) =>
-      current.map((flow, flowIndex) =>
-        flowIndex === index ? { ...flow, status: !flow.status } : flow,
-      ),
-    );
-  }
 
   function applyOpportunity(index: number) {
     setApplied((current) =>
@@ -740,28 +715,27 @@ export default function CommerceSuite() {
                     0}
                 </span>
               )}
-              {label === "Lifecycle" && (
-                <span className="commerce-nav-alert">1</span>
-              )}
             </button>
           ))}
         </nav>
 
         <div className="commerce-sidebar-spacer" />
 
-        <div className="commerce-health-card">
-          <div>
-            <span>Store health</span>
-            <strong>82</strong>
+        {overview && (
+          <div className="commerce-health-card">
+            <div>
+              <span>Store health</span>
+              <strong>{storeHealthScore(overview)}</strong>
+            </div>
+            <div className="commerce-health-track">
+              <i style={{ width: `${storeHealthScore(overview)}%` }} />
+            </div>
+            <p>{storeHealthCopy(overview)}</p>
+            <button onClick={() => setSection("Analytics")}>
+              View health report <Icon size={14}>{icons.arrow}</Icon>
+            </button>
           </div>
-          <div className="commerce-health-track">
-            <i />
-          </div>
-          <p>Strong foundation. Retention is your biggest growth opportunity.</p>
-          <button onClick={() => setSection("Analytics")}>
-            View health report <Icon size={14}>{icons.arrow}</Icon>
-          </button>
-        </div>
+        )}
 
         <Link href="/" className="commerce-side-link">
           <Icon size={18}>{icons.home}</Icon>
@@ -835,10 +809,11 @@ export default function CommerceSuite() {
               </Icon>
               <span>
                 {!shopifyConfigured
-                  ? "Shopify backend is not configured yet. Add the environment variables and run the database migration."
+                  ? configError ||
+                    "Shopify backend is not configured yet. Add the environment variables and run the database migration."
                   : connectionMessage}
               </span>
-              {!shopifyConfigured && (
+              {!shopifyConfigured && !configError && (
                 <code>npm run db:migrate</code>
               )}
               <button
@@ -863,6 +838,14 @@ export default function CommerceSuite() {
               connectionId={selectedConnection?.id ?? null}
               currencyCode={selectedConnection?.currencyCode ?? "USD"}
             />
+          ) : section === "Lifecycle" ? (
+            <section className="commerce-title-row">
+              <div>
+                <span className="commerce-kicker">Lifecycle</span>
+                <h1>Email and retention drafts</h1>
+                <p>No attribution until a provider is connected.</p>
+              </div>
+            </section>
           ) : (
             <>
           <section className="commerce-title-row">
@@ -1144,38 +1127,15 @@ export default function CommerceSuite() {
               <div className="commerce-card-heading">
                 <div>
                   <h2>Lifecycle flows</h2>
-                  <p>$18.4k attributed this month</p>
+                  <p>No attribution until a provider is connected.</p>
                 </div>
-                <button onClick={() => setSection("Lifecycle")}>
-                  Manage
-                </button>
               </div>
-              <div className="commerce-flow-list">
-                {flows.map((flow, index) => (
-                  <article key={flow.name}>
-                    <span className={`commerce-flow-icon ${flow.tone}`}>
-                      <Icon size={17}>{icons.mail}</Icon>
-                    </span>
-                    <div>
-                      <strong>{flow.name}</strong>
-                      <small>
-                        {flow.trigger} · {flow.messages} emails
-                      </small>
-                    </div>
-                    <span className="commerce-flow-revenue">{flow.revenue}</span>
-                    <button
-                      aria-label={`${flow.status ? "Pause" : "Enable"} ${flow.name}`}
-                      className={`commerce-toggle ${flow.status ? "on" : ""}`}
-                      onClick={() => toggleFlow(index)}
-                    >
-                      <i />
-                    </button>
-                  </article>
-                ))}
-              </div>
-              <button className="commerce-create-flow">
+              <button
+                className="commerce-create-flow"
+                onClick={() => setSection("Lifecycle")}
+              >
                 <Icon size={15}>{icons.plus}</Icon>
-                Create a lifecycle flow
+                Generate lifecycle drafts
               </button>
             </aside>
           </section>

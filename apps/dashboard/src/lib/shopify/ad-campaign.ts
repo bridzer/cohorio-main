@@ -109,6 +109,7 @@ function creativeFor(
   brief: CampaignBrief,
   angle: CampaignCreative["angle"],
   index: number,
+  brandContextMarkdown: string,
 ): CampaignCreative {
   const limits = LIMITS[brief.platform];
   const offer = brief.offer?.trim() || null;
@@ -162,6 +163,7 @@ function creativeFor(
       description: limits.description,
     },
     grounding: [
+      brandContextMarkdown.slice(0, 500),
       `Shopify product: ${product.title}`,
       `Merchant value proposition: ${brief.valueProposition}`,
       ...(offer ? [`Merchant offer: ${offer}`] : []),
@@ -173,10 +175,17 @@ function creativeFor(
 export function generateAdCampaign(
   brief: CampaignBrief,
   products: CampaignProduct[],
+  brandContextMarkdown: string,
 ): GeneratedCampaign {
   const creatives = products.flatMap((product, productIndex) =>
     (["product", "audience", "offer"] as const).map((angle, angleIndex) =>
-      creativeFor(product, brief, angle, productIndex * 3 + angleIndex),
+      creativeFor(
+        product,
+        brief,
+        angle,
+        productIndex * 3 + angleIndex,
+        brandContextMarkdown,
+      ),
     ),
   );
   const testingBudget = Math.round(brief.dailyBudget * 0.3 * 100) / 100;

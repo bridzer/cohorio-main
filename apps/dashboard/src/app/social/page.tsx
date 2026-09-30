@@ -114,13 +114,10 @@ const platformConfig: Record<
   Instagram: { mark: "◎", className: "instagram", limit: 2200 },
 };
 
-const seedPosts: Record<Platform, string> = {
-  LinkedIn:
-    "Most teams don’t have a content problem.\n\nThey have a context problem.\n\nWhen your strategy, customer language, and proof live in different places, every post starts from zero.\n\nWe built one brand brain that keeps all three in the room—so a rough idea can become a week of useful content without losing your voice.\n\nWhat part of content creation slows your team down most?",
-  X:
-    "Most teams don’t have a content problem.\n\nThey have a context problem.\n\nOne shared brand brain turns scattered ideas into consistent, useful content—without starting from zero every time.",
-  Instagram:
-    "Your content calendar isn’t empty because you lack ideas.\n\nIt’s empty because your best ideas are scattered across docs, calls, and half-finished notes.\n\nBring the context together. Then create from what your team already knows.\n\nSave this for your next planning session. ✦\n\n#contentstrategy #saasmarketing #marketingteam",
+const emptyPosts: Record<Platform, string> = {
+  LinkedIn: "",
+  X: "",
+  Instagram: "",
 };
 
 const week = [
@@ -188,10 +185,11 @@ export default function SocialStudio() {
   const [source, setSource] = useState(
     "One shared brand brain turns scattered product knowledge into consistent marketing. Teams can create faster without losing their voice.",
   );
-  const [posts, setPosts] = useState(seedPosts);
+  const [posts, setPosts] = useState(emptyPosts);
   const [tone, setTone] = useState("Clear & insightful");
   const [scheduled, setScheduled] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState("");
 
   const activePost = posts[activePlatform];
   const charCount = activePost.length;
@@ -217,20 +215,42 @@ export default function SocialStudio() {
     });
   }
 
-  function generate(event: FormEvent) {
+  async function generate(event: FormEvent) {
     event.preventDefault();
-    if (!source.trim()) return;
+    if (!source.trim() || generating) return;
     setGenerating(true);
+    setGenerateError("");
     setScheduled(false);
-    window.setTimeout(() => {
-      const idea = source.trim().replace(/[.!?]+$/, "");
-      setPosts({
-        LinkedIn: `${idea}.\n\nBut here’s the part most teams miss:\n\nA strong content system doesn’t ask you to create more. It helps you extract more value from what you already know.\n\nStart with one clear idea. Adapt the format—not the truth behind it.\n\nWhat’s one idea your team should be known for?`,
-        X: `${idea}.\n\nThe better play:\n\n1. Start with one clear idea\n2. Adapt it to the platform\n3. Keep the insight intact\n\nRepurpose the value, not just the words.`,
-        Instagram: `${idea}. ✦\n\nOne idea can become a full week of content when you adapt the format without watering down the insight.\n\nSave this for your next content batch.\n\n#contentstrategy #marketingtips #brandbuilding`,
+    try {
+      const response = await fetch("/api/social/generate", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: source.trim(),
+          platforms: selectedPlatforms,
+          tone,
+        }),
       });
+      const payload = (await response.json()) as {
+        posts?: Partial<Record<Platform, string>>;
+        error?: string;
+      };
+      if (!response.ok || !payload.posts) {
+        throw new Error(payload.error || "Unable to generate posts.");
+      }
+      setPosts((current) => ({ ...current, ...payload.posts }));
+      const nextPlatform = selectedPlatforms[0];
+      if (nextPlatform && !selectedPlatforms.includes(activePlatform)) {
+        setActivePlatform(nextPlatform);
+      }
+    } catch (error) {
+      setGenerateError(
+        error instanceof Error ? error.message : "Unable to generate posts.",
+      );
+    } finally {
       setGenerating(false);
-    }, 650);
+    }
   }
 
   return (
@@ -438,13 +458,22 @@ export default function SocialStudio() {
                   </div>
                 </div>
 
-                <button className="social-generate" type="submit">
+                <button
+                  className="social-generate"
+                  type="submit"
+                  disabled={generating || !source.trim()}
+                >
                   <Glyph size={18}>{icons.magic}</Glyph>
                   {generating
                     ? "Shaping your posts..."
                     : `Generate for ${selectedLabel}`}
                   <span>⌘ ↵</span>
                 </button>
+                {generateError ? (
+                  <p className="social-generate-error" role="alert">
+                    {generateError}
+                  </p>
+                ) : null}
               </form>
             </div>
 

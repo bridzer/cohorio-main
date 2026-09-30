@@ -878,6 +878,26 @@ button {
   color: #b3b9b4;
 }
 
+.activity-empty {
+  margin: 16px 0 0;
+  color: #6f776f;
+  font-size: 13px;
+}
+
+.workspace-panel {
+  border: 1px solid #e0e4dd;
+  border-radius: 14px;
+  background: #fff;
+  padding: 20px;
+}
+
+.connection-links {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
 .file-tile {
   display: flex;
   width: 35px;

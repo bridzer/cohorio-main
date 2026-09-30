@@ -40,9 +40,18 @@ cannot attach a shop to the signed-in workspace.
 
 ## Security boundary
 
-The current prototype identifies an anonymous workspace with an HTTP-only
-cookie. Add application authentication before production so the workspace ID is
-derived from the authenticated organization.
+Sessions are NextAuth JWTs. `src/proxy.ts` allows a request only when `auth()`
+returns a `session.user.id`; a cookie with the Auth.js name is not enough.
+Workspace and Shopify data are scoped by `requireWorkspaceAccess` on each
+server route, not by an anonymous workspace cookie.
+
+Set `AUTH_TRUST_PROXY=true` in production behind Railway (or another reverse
+proxy) so auth rate limits use the last `X-Forwarded-For` hop. Leave it `false`
+for direct local access so clients cannot spoof `X-Forwarded-For`.
+
+`GET /api/shopify/connections` validates `SHOPIFY_CLIENT_SECRET` and HTTPS
+`APP_URL` through `shopifyConfig()`. A token-shaped secret or HTTP app URL
+returns `configured: false` and a `configError` string, never the secret value.
 
 Never expose Shopify tokens or `SHOPIFY_TOKEN_ENCRYPTION_KEY` to the browser.
 All Shopify API requests must remain in server routes or server jobs.

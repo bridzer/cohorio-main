@@ -9,6 +9,11 @@ import {
   productBelongsToConnection,
 } from "@/lib/shopify/repository";
 import {
+  analyzeProductCro,
+  type ProductCroInput,
+} from "@/lib/shopify/product-cro";
+import { workspaceContextMarkdown } from "@/lib/marketing-context-prompt";
+import {
   accessErrorResponse,
   requireWorkspaceAccess,
 } from "@/lib/access-control";
@@ -32,19 +37,43 @@ export async function GET(
     }
 
     const products = await listShopifyProducts(id, workspaceId);
-    const averageScore = products.length
+    const brandContextMarkdown = await workspaceContextMarkdown(workspaceId);
+    const analyzed = products.map((product) => {
+      const input: ProductCroInput = {
+        title: product.title,
+        descriptionText: product.descriptionText,
+        vendor: product.vendor,
+        productType: product.productType,
+        tags: product.tags,
+        mediaCount: product.mediaCount,
+        variantsCount: product.variantsCount,
+        seoTitle: product.seoTitle,
+        seoDescription: product.seoDescription,
+        onlineStoreUrl: product.onlineStoreUrl,
+        status: product.status,
+        totalInventory: product.totalInventory,
+        minimumPrice: product.minimumPrice,
+      };
+      const cro = analyzeProductCro(input, brandContextMarkdown);
+      return {
+        ...product,
+        croScore: cro.score,
+        croRecommendations: cro.recommendations,
+      };
+    });
+    const averageScore = analyzed.length
       ? Math.round(
-          products.reduce((total, product) => total + product.croScore, 0) /
-            products.length,
+          analyzed.reduce((total, product) => total + product.croScore, 0) /
+            analyzed.length,
         )
       : 0;
 
     return NextResponse.json({
       summary: {
-        products: products.length,
+        products: analyzed.length,
         averageScore,
-        needsWork: products.filter((product) => product.croScore < 60).length,
-        highPriorityIssues: products.reduce(
+        needsWork: analyzed.filter((product) => product.croScore < 60).length,
+        highPriorityIssues: analyzed.reduce(
           (total, product) =>
             total +
             product.croRecommendations.filter(
@@ -53,7 +82,7 @@ export async function GET(
           0,
         ),
       },
-      products,
+      products: analyzed,
     });
   } catch (error) {
     const accessResponse = accessErrorResponse(error);
