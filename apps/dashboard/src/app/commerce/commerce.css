@@ -2258,3 +2258,103 @@
     padding: 16px;
   }
 }
+
+.commerce-section-empty {
+  margin: 18px 0 0;
+  color: #667068;
+  font-size: 13px;
+}
+
+.commerce-analytics-totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 180px));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.commerce-analytics-totals article {
+  padding: 14px 16px;
+  border: 1px solid #e0e3de;
+  border-radius: 12px;
+  background: #fcfdfb;
+}
+
+.commerce-analytics-totals span {
+  display: block;
+  color: #7a837d;
+  font-size: 11px;
+}
+
+.commerce-analytics-totals strong {
+  display: block;
+  margin-top: 6px;
+  color: #19241f;
+  font-size: 22px;
+}
+
+.commerce-analytics-series {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  min-height: 160px;
+  margin-top: 22px;
+  overflow-x: auto;
+}
+
+.commerce-analytics-series > div {
+  display: flex;
+  width: 18px;
+  flex: 0 0 18px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.commerce-analytics-series span {
+  display: block;
+  width: 10px;
+  border-radius: 4px 4px 0 0;
+  background: #477e68;
+}
+
+.commerce-analytics-series small {
+  color: #7a837d;
+  font-size: 8px;
+  writing-mode: vertical-rl;
+}
+
+.commerce-lifecycle-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.commerce-lifecycle-list article {
+  padding: 16px;
+  border: 1px solid #e0e3de;
+  border-radius: 12px;
+  background: #fcfdfb;
+}
+
+.commerce-lifecycle-list header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.commerce-lifecycle-list strong {
+  color: #19241f;
+}
+
+.commerce-lifecycle-list header span,
+.commerce-lifecycle-list pre {
+  color: #667068;
+  font-size: 12px;
+}
+
+.commerce-lifecycle-list pre {
+  margin: 12px 0 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+}

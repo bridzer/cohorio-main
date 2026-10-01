@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 
 type IconName =
@@ -233,6 +233,25 @@ type DashboardAccount = {
   };
 };
 
+type CopilotRun = {
+  id: string;
+  skill_id: string;
+  output: string;
+  created_at: string;
+};
+
+function subscribeToToday() {
+  return () => {};
+}
+
+function todayLabelSnapshot() {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  }).format(new Date());
+}
+
 export default function Home() {
   const router = useRouter();
   const [activeNav, setActiveNav] = useState("Overview");
@@ -243,7 +262,13 @@ export default function Home() {
   const [assistantMessage, setAssistantMessage] = useState(
     "What are we working on today?",
   );
-  const [todayLabel, setTodayLabel] = useState("");
+  const todayLabel = useSyncExternalStore(
+    subscribeToToday,
+    todayLabelSnapshot,
+    () => "",
+  );
+  const [copilotRuns, setCopilotRuns] = useState<CopilotRun[]>([]);
+  const [running, setRunning] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -284,13 +309,20 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    setTodayLabel(
-      new Intl.DateTimeFormat("en-US", {
-        weekday: "long",
-        month: "long",
-        day: "numeric",
-      }).format(new Date()),
-    );
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch("/api/copilot/runs", { cache: "no-store" });
+        if (!response.ok) return;
+        const data = (await response.json()) as { runs?: CopilotRun[] };
+        if (!cancelled) setCopilotRuns(data.runs ?? []);
+      } catch {
+        // Recent work stays empty until the runs API is available.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const displayName = account?.user.name?.trim() || "there";
@@ -305,16 +337,50 @@ export default function Home() {
       filter === "All" ? tasks : tasks.filter((task) => task.category === filter),
     [filter],
   );
-  const copilotRuns: { skill_id: string; created_at: string }[] = [];
+  const copilotRunsKey = (run: CopilotRun) => run.id;
+
+  async function refreshRuns() {
+    const response = await fetch("/api/copilot/runs", { cache: "no-store" });
+    if (!response.ok) return;
+    const data = (await response.json()) as { runs?: CopilotRun[] };
+    setCopilotRuns(data.runs ?? []);
+  }
+
+  async function runPlaybook(skillId: string, playbookPrompt: string) {
+    setRunning(true);
+    setActiveNav("Ask Cohorio");
+    setAssistantMessage("Working through that playbook...");
+    try {
+      const response = await fetch("/api/copilot/runs", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ skillId, prompt: playbookPrompt }),
+      });
+      const payload = (await response.json()) as {
+        run?: CopilotRun;
+        error?: string;
+      };
+      if (!response.ok || !payload.run) {
+        throw new Error(payload.error || "Unable to run this playbook.");
+      }
+      setAssistantMessage(payload.run.output);
+      await refreshRuns();
+    } catch (error) {
+      setAssistantMessage(
+        error instanceof Error ? error.message : "Unable to run this playbook.",
+      );
+    } finally {
+      setRunning(false);
+    }
+  }
 
   function submitPrompt(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const cleanPrompt = prompt.trim();
-    if (!cleanPrompt) return;
-    setAssistantMessage(
-      `I’ll turn “${cleanPrompt}” into a focused marketing workflow. Connect an AI provider to run it end-to-end.`,
-    );
+    if (!cleanPrompt || running) return;
     setPrompt("");
+    void runPlaybook("copywriting", cleanPrompt);
   }
 
   function selectTask(task: (typeof tasks)[number]) {
@@ -322,10 +388,8 @@ export default function Home() {
       router.push("/social");
       return;
     }
-    setActiveNav("Ask Cohorio");
-    setAssistantMessage(
-      `${task.title} is ready. I’ll use the ${task.skill} playbook and your product context to guide the work.`,
-    );
+    if (running) return;
+    void runPlaybook(task.skill, `${task.title}\n${task.description}`);
   }
 
   return (
@@ -448,7 +512,7 @@ export default function Home() {
               ) : (
                 <div className="activity-list">
                   {copilotRuns.map((run) => (
-                    <div className="activity-row" key={`${run.skill_id}-${run.created_at}`}>
+                    <div className="activity-row" key={copilotRunsKey(run)}>
                       <span className="activity-copy">
                         <strong>{run.skill_id}</strong>
                         <span>
@@ -532,7 +596,7 @@ export default function Home() {
                   onChange={(event) => setPrompt(event.target.value)}
                   placeholder="Try “Turn our latest blog post into a LinkedIn campaign”"
                 />
-                <button type="submit" aria-label="Send prompt">
+                <button type="submit" aria-label="Send prompt" disabled={running}>
                   <Icon name="send" size={18} />
                 </button>
               </form>
@@ -619,7 +683,7 @@ export default function Home() {
                   {copilotRuns.map((run) => (
                     <div
                       className="activity-row"
-                      key={`${run.skill_id}-${run.created_at}`}
+                      key={copilotRunsKey(run)}
                     >
                       <span className="activity-copy">
                         <strong>{run.skill_id}</strong>

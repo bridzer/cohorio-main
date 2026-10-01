@@ -5,6 +5,8 @@ import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import { accountInitials, useAccount } from "@/lib/use-account";
 import { startShopifyOAuth } from "@/lib/shopify/start-oauth";
 import AdCampaignBuilder from "./AdCampaignBuilder";
+import CommerceAnalytics from "./CommerceAnalytics";
+import LifecycleDrafts from "./LifecycleDrafts";
 import ProductCroWorkspace from "./ProductCroWorkspace";
 import "./commerce.css";
 
@@ -839,13 +841,9 @@ export default function CommerceSuite() {
               currencyCode={selectedConnection?.currencyCode ?? "USD"}
             />
           ) : section === "Lifecycle" ? (
-            <section className="commerce-title-row">
-              <div>
-                <span className="commerce-kicker">Lifecycle</span>
-                <h1>Email and retention drafts</h1>
-                <p>No attribution until a provider is connected.</p>
-              </div>
-            </section>
+            <LifecycleDrafts connectionId={selectedConnection?.id ?? null} />
+          ) : section === "Analytics" ? (
+            <CommerceAnalytics connectionId={selectedConnection?.id ?? null} />
           ) : (
             <>
           <section className="commerce-title-row">

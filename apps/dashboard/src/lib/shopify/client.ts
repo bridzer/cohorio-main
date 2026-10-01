@@ -16,6 +16,10 @@ import {
   type ShopifyqlQueryResult,
 } from "./daily-sales";
 import {
+  PRODUCT_SALES_QUERY,
+  productMetricsFromShopifyql,
+} from "./product-sales";
+import {
   expandShopifyScopes,
   missingShopifyScopes,
   parseShopifyScopes,
@@ -456,29 +460,6 @@ type ShopifyProductsPage = {
   };
 };
 
-type ShopifyOrdersPage = {
-  orders: {
-    nodes: {
-      createdAt: string;
-      cancelledAt: string | null;
-      test: boolean;
-      displayFinancialStatus: string | null;
-      currentTotalPriceSet: { shopMoney: ShopifyMoney };
-      lineItems: {
-        nodes: {
-          quantity: number;
-          discountedTotalSet: { shopMoney: ShopifyMoney };
-          product: { id: string } | null;
-        }[];
-      };
-    }[];
-    pageInfo: {
-      hasNextPage: boolean;
-      endCursor: string | null;
-    };
-  };
-};
-
 export type ShopifyProductSnapshot = {
   shopifyProductId: string;
   title: string;
@@ -561,56 +542,7 @@ const PRODUCTS_PAGE_QUERY = `#graphql
   }
 `;
 
-const ORDERS_PAGE_QUERY = `#graphql
-  query CohorioOrders($after: String, $query: String!) {
-    orders(
-      first: 25
-      after: $after
-      query: $query
-      sortKey: CREATED_AT
-      reverse: true
-    ) {
-      nodes {
-        createdAt
-        cancelledAt
-        test
-        displayFinancialStatus
-        currentTotalPriceSet {
-          shopMoney {
-            amount
-            currencyCode
-          }
-        }
-        lineItems(first: 25) {
-          nodes {
-            quantity
-            discountedTotalSet {
-              shopMoney {
-                amount
-                currencyCode
-              }
-            }
-            product {
-              id
-            }
-          }
-        }
-      }
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-    }
-  }
-`;
-
 const MAX_PRODUCT_PAGES = 20;
-const MAX_ORDER_PAGES = 40;
-const INCLUDED_FINANCIAL_STATUSES = new Set([
-  "PAID",
-  "PARTIALLY_PAID",
-  "PARTIALLY_REFUNDED",
-]);
 
 function numberFromShopify(value: string) {
   const parsed = Number(value);
@@ -720,63 +652,22 @@ export async function fetchShopifyOverview(
     }
   }
 
-  const now = new Date();
-  const currentPeriodStart = new Date(now);
-  currentPeriodStart.setUTCDate(currentPeriodStart.getUTCDate() - 29);
-  currentPeriodStart.setUTCHours(0, 0, 0, 0);
-  const comparisonStart = new Date(currentPeriodStart);
-  comparisonStart.setUTCDate(comparisonStart.getUTCDate() - 30);
-
-  const productById = new Map(
-    products.map((product) => [product.shopifyProductId, product]),
+  const sales = await shopifyGraphql<ShopifyqlQueryResult>(
+    connectionId,
+    workspaceId,
+    PRODUCT_SALES_QUERY,
   );
-  let ordersCursor: string | null = null;
-  let ordersComplete = true;
-
-  for (let page = 0; page < MAX_ORDER_PAGES; page += 1) {
-    const payload: ShopifyOrdersPage = await shopifyGraphql<ShopifyOrdersPage>(
-      connectionId,
-      workspaceId,
-      ORDERS_PAGE_QUERY,
-      {
-        after: ordersCursor,
-        query: `created_at:>='${comparisonStart.toISOString()}'`,
-      },
-    );
-
-    for (const order of payload.orders.nodes) {
-      if (
-        order.cancelledAt ||
-        order.test ||
-        !order.displayFinancialStatus ||
-        !INCLUDED_FINANCIAL_STATUSES.has(order.displayFinancialStatus)
-      ) {
-        continue;
-      }
-
-      if (new Date(order.createdAt) < currentPeriodStart) continue;
-      for (const lineItem of order.lineItems.nodes) {
-        if (!lineItem.product) continue;
-        const product = productById.get(lineItem.product.id);
-        if (!product) continue;
-        product.revenue30d += numberFromShopify(
-          lineItem.discountedTotalSet.shopMoney.amount,
-        );
-        product.unitsSold30d += lineItem.quantity;
-      }
-    }
-
-    if (!payload.orders.pageInfo.hasNextPage) break;
-    ordersCursor = payload.orders.pageInfo.endCursor;
-    if (!ordersCursor || page === MAX_ORDER_PAGES - 1) {
-      ordersComplete = false;
-      break;
-    }
+  const productSales = productMetricsFromShopifyql(sales);
+  for (const product of products) {
+    const metric = productSales.metrics.get(product.shopifyProductId);
+    if (!metric) continue;
+    product.revenue30d = metric.revenue30d;
+    product.unitsSold30d = metric.unitsSold30d;
   }
 
   return {
     products,
     dailyMetrics,
-    complete: productsComplete && ordersComplete,
+    complete: productsComplete && productSales.parseErrors.length === 0,
   };
 }

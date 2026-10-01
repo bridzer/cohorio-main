@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, ReactNode, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import { accountInitials, useAccount } from "@/lib/use-account";
 import "./social.css";
 
@@ -120,40 +120,14 @@ const emptyPosts: Record<Platform, string> = {
   Instagram: "",
 };
 
-const week = [
-  {
-    day: "Mon",
-    date: "10",
-    posts: [
-      { time: "9:30", title: "The context gap", platform: "in", tone: "blue" },
-      { time: "14:00", title: "3 hooks to test", platform: "𝕏", tone: "ink" },
-    ],
-  },
-  {
-    day: "Tue",
-    date: "11",
-    posts: [
-      { time: "11:00", title: "Build in public", platform: "◎", tone: "pink" },
-    ],
-  },
-  {
-    day: "Wed",
-    date: "12",
-    current: true,
-    posts: [
-      { time: "10:00", title: "Why voice drifts", platform: "in", tone: "blue" },
-      { time: "16:30", title: "Founder lesson", platform: "𝕏", tone: "ink" },
-    ],
-  },
-  { day: "Thu", date: "13", posts: [] },
-  {
-    day: "Fri",
-    date: "14",
-    posts: [
-      { time: "9:00", title: "Weekly teardown", platform: "in", tone: "blue" },
-    ],
-  },
-];
+type SavedPost = {
+  id: string;
+  platform: Platform;
+  body: string;
+  scheduledFor: string | null;
+  status: "draft" | "scheduled" | "published";
+  createdAt: string;
+};
 
 const pillars = [
   { label: "Industry insight", percent: 30, color: "#5f8de4" },
@@ -190,6 +164,17 @@ export default function SocialStudio() {
   const [scheduled, setScheduled] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState("");
+  const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
+  const [postIds, setPostIds] = useState<Partial<Record<Platform, string>>>({});
+  const [saving, setSaving] = useState(false);
+
+  const draftCount = savedPosts.filter((post) => post.status === "draft").length;
+  const scheduledCount = savedPosts.filter(
+    (post) => post.status === "scheduled",
+  ).length;
+  const publishedCount = savedPosts.filter(
+    (post) => post.status === "published",
+  ).length;
 
   const activePost = posts[activePlatform];
   const charCount = activePost.length;
@@ -202,6 +187,23 @@ export default function SocialStudio() {
         : selectedPlatforms.join(" and "),
     [selectedPlatforms],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch("/api/social/posts", { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = (await response.json()) as { posts?: SavedPost[] };
+        if (!cancelled) setSavedPosts(payload.posts ?? []);
+      } catch {
+        // Saved posts stay empty until the API responds.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function togglePlatform(platform: Platform) {
     setSelectedPlatforms((current) => {
@@ -234,12 +236,21 @@ export default function SocialStudio() {
       });
       const payload = (await response.json()) as {
         posts?: Partial<Record<Platform, string>>;
+        saved?: SavedPost[];
         error?: string;
       };
       if (!response.ok || !payload.posts) {
         throw new Error(payload.error || "Unable to generate posts.");
       }
       setPosts((current) => ({ ...current, ...payload.posts }));
+      if (payload.saved?.length) {
+        setSavedPosts((current) => [...payload.saved!, ...current]);
+        setPostIds((current) => {
+          const next = { ...current };
+          for (const post of payload.saved ?? []) next[post.platform] = post.id;
+          return next;
+        });
+      }
       const nextPlatform = selectedPlatforms[0];
       if (nextPlatform && !selectedPlatforms.includes(activePlatform)) {
         setActivePlatform(nextPlatform);
@@ -252,6 +263,120 @@ export default function SocialStudio() {
       setGenerating(false);
     }
   }
+
+  async function saveDraft() {
+    if (!activePost.trim() || saving) return;
+    setSaving(true);
+    setGenerateError("");
+    try {
+      const response = await fetch("/api/social/posts", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          platform: activePlatform,
+          body: activePost,
+          sourcePrompt: source,
+        }),
+      });
+      const payload = (await response.json()) as {
+        post?: SavedPost;
+        error?: string;
+      };
+      if (!response.ok || !payload.post) {
+        throw new Error(payload.error || "Unable to save this draft.");
+      }
+      setSavedPosts((current) => [payload.post!, ...current]);
+      setPostIds((current) => ({
+        ...current,
+        [activePlatform]: payload.post!.id,
+      }));
+      setView("Library");
+    } catch (error) {
+      setGenerateError(
+        error instanceof Error ? error.message : "Unable to save this draft.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function scheduleActivePost() {
+    if (saving) return;
+    setSaving(true);
+    setGenerateError("");
+    try {
+      let id = postIds[activePlatform];
+      if (!id) {
+        if (!activePost.trim()) return;
+        const created = await fetch("/api/social/posts", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            platform: activePlatform,
+            body: activePost,
+            sourcePrompt: source,
+          }),
+        });
+        const createdPayload = (await created.json()) as {
+          post?: SavedPost;
+          error?: string;
+        };
+        if (!created.ok || !createdPayload.post) {
+          throw new Error(createdPayload.error || "Unable to save this post.");
+        }
+        id = createdPayload.post.id;
+        setSavedPosts((current) => [createdPayload.post!, ...current]);
+      }
+      const when = new Date();
+      when.setDate(when.getDate() + 1);
+      when.setHours(10, 0, 0, 0);
+      const response = await fetch(`/api/social/posts/${id}`, {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "scheduled",
+          scheduledFor: when.toISOString(),
+        }),
+      });
+      const payload = (await response.json()) as {
+        post?: SavedPost;
+        error?: string;
+      };
+      if (!response.ok || !payload.post) {
+        throw new Error(payload.error || "Unable to schedule this post.");
+      }
+      setSavedPosts((current) => {
+        const next = current.filter((post) => post.id !== payload.post!.id);
+        return [payload.post!, ...next];
+      });
+      setPostIds((current) => ({
+        ...current,
+        [activePlatform]: payload.post!.id,
+      }));
+      setScheduled(true);
+    } catch (error) {
+      setGenerateError(
+        error instanceof Error ? error.message : "Unable to schedule this post.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const calendarGroups = useMemo(() => {
+    const groups = new Map<string, SavedPost[]>();
+    for (const post of savedPosts) {
+      if (!post.scheduledFor) continue;
+      const day = post.scheduledFor.slice(0, 10);
+      groups.set(day, [...(groups.get(day) ?? []), post]);
+    }
+    return [...groups.entries()].sort(([left], [right]) =>
+      left.localeCompare(right),
+    );
+  }, [savedPosts]);
 
   return (
     <div className="social-shell">
@@ -289,7 +414,9 @@ export default function SocialStudio() {
             >
               <Glyph size={18}>{icon}</Glyph>
               {label}
-              {label === "Calendar" && <span className="social-count">6</span>}
+              {label === "Calendar" && scheduledCount > 0 && (
+                <span className="social-count">{scheduledCount}</span>
+              )}
             </button>
           ))}
         </nav>
@@ -297,12 +424,14 @@ export default function SocialStudio() {
         <div className="social-sidebar-spacer" />
 
         <div className="social-plan">
-          <span>Weekly rhythm</span>
-          <strong>6 of 9 posts ready</strong>
+          <span>Saved posts</span>
+          <strong>
+            {draftCount} drafts · {scheduledCount} scheduled
+          </strong>
           <div>
             <i />
           </div>
-          <small>3 open slots this week</small>
+          <small>{publishedCount} published</small>
         </div>
 
         <Link href="/" className="social-back">
@@ -335,9 +464,9 @@ export default function SocialStudio() {
             <strong>{view}</strong>
           </div>
           <div className="social-top-actions">
-            <button className="social-connect">
+            <button className="social-connect" type="button">
               <span className="social-live-dot" />
-              3 channels connected
+              {savedPosts.length} saved posts
             </button>
             <button className="social-primary" onClick={() => setView("Calendar")}>
               <Glyph size={16}>{icons.calendar}</Glyph>
@@ -347,6 +476,68 @@ export default function SocialStudio() {
         </header>
 
         <div className="social-content">
+          {view === "Calendar" ? (
+            <section className="social-saved-panel">
+              <h2>Calendar</h2>
+              {calendarGroups.length ? (
+                calendarGroups.map(([day, postsForDay]) => (
+                  <div key={day} className="social-saved-group">
+                    <h3>
+                      {new Intl.DateTimeFormat("en-US", {
+                        weekday: "long",
+                        month: "long",
+                        day: "numeric",
+                        timeZone: "UTC",
+                      }).format(new Date(`${day}T00:00:00Z`))}
+                    </h3>
+                    {postsForDay.map((post) => (
+                      <article key={post.id}>
+                        <strong>{post.platform}</strong>
+                        <p>{post.body}</p>
+                      </article>
+                    ))}
+                  </div>
+                ))
+              ) : (
+                <p>No scheduled posts yet.</p>
+              )}
+            </section>
+          ) : view === "Library" ? (
+            <section className="social-saved-panel">
+              <h2>Library</h2>
+              {savedPosts.some((post) => post.status === "draft") ? (
+                savedPosts
+                  .filter((post) => post.status === "draft")
+                  .map((post) => (
+                    <article key={post.id}>
+                      <strong>{post.platform}</strong>
+                      <p>{post.body}</p>
+                    </article>
+                  ))
+              ) : (
+                <p>No drafts yet.</p>
+              )}
+            </section>
+          ) : view === "Analytics" ? (
+            <section className="social-saved-panel">
+              <h2>Analytics</h2>
+              <div className="social-analytics-counts">
+                <article>
+                  <span>Drafts</span>
+                  <strong>{draftCount}</strong>
+                </article>
+                <article>
+                  <span>Scheduled</span>
+                  <strong>{scheduledCount}</strong>
+                </article>
+                <article>
+                  <span>Published</span>
+                  <strong>{publishedCount}</strong>
+                </article>
+              </div>
+            </section>
+          ) : (
+          <>
           <section className="social-title-row">
             <div>
               <span className="social-kicker">Create once. Adapt everywhere.</span>
@@ -355,11 +546,6 @@ export default function SocialStudio() {
                 Turn a rough idea, article, or transcript into posts shaped for
                 every platform.
               </p>
-            </div>
-            <div className="social-week-switch">
-              <button aria-label="Previous week">‹</button>
-              <span>Aug 10 – 14</span>
-              <button aria-label="Next week">›</button>
             </div>
           </section>
 
@@ -509,7 +695,7 @@ export default function SocialStudio() {
                   <div>
                     <strong>{account?.user.name ?? "Cohorio user"}</strong>
                     <small>
-                      {account?.access.organizationName ?? "Cohorio"} · 1m
+                      {account?.access.organizationName ?? "Cohorio"}
                     </small>
                   </div>
                   <b>•••</b>
@@ -545,18 +731,22 @@ export default function SocialStudio() {
               <div className="social-preview-actions">
                 <button
                   className="social-secondary"
-                  onClick={() => setView("Library")}
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void saveDraft()}
                 >
-                  Save draft
+                  {saving ? "Saving..." : "Save draft"}
                 </button>
                 <button
                   className={`social-schedule ${scheduled ? "scheduled" : ""}`}
-                  onClick={() => setScheduled(true)}
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void scheduleActivePost()}
                 >
                   <Glyph size={16}>
                     {scheduled ? icons.check : icons.calendar}
                   </Glyph>
-                  {scheduled ? "Scheduled for Wed, 10:00" : "Schedule post"}
+                  {scheduled ? "Scheduled for tomorrow, 10:00" : "Schedule post"}
                 </button>
               </div>
             </div>
@@ -566,77 +756,19 @@ export default function SocialStudio() {
             <div className="social-calendar-card">
               <div className="social-card-heading">
                 <div>
-                  <h2>This week</h2>
-                  <p>6 scheduled posts · 3 open slots</p>
+                  <h2>Scheduled</h2>
+                  <p>
+                    {scheduledCount} scheduled · {draftCount} drafts
+                  </p>
                 </div>
                 <button onClick={() => setView("Calendar")}>
                   Open calendar <Glyph size={15}>{icons.chevron}</Glyph>
                 </button>
               </div>
-              <div className="social-mini-calendar">
-                {week.map((day) => (
-                  <div
-                    key={day.day}
-                    className={`social-day ${day.current ? "current" : ""}`}
-                  >
-                    <div className="social-day-heading">
-                      <span>{day.day}</span>
-                      <strong>{day.date}</strong>
-                    </div>
-                    <div className="social-day-posts">
-                      {day.posts.map((post) => (
-                        <button key={`${day.day}-${post.time}`}>
-                          <span className={`social-platform-mini ${post.tone}`}>
-                            {post.platform}
-                          </span>
-                          <span>
-                            <strong>{post.title}</strong>
-                            <small>{post.time}</small>
-                          </span>
-                        </button>
-                      ))}
-                      {day.posts.length === 0 && (
-                        <button className="social-empty-slot">
-                          <Glyph size={14}>{icons.plus}</Glyph>
-                          Add post
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
-
-            <aside className="social-pillars-card">
-              <div className="social-card-heading">
-                <div>
-                  <h2>Content mix</h2>
-                  <p>Your target pillar balance</p>
-                </div>
-                <button aria-label="Edit content mix">Edit</button>
-              </div>
-              <div className="social-pillar-bar">
-                {pillars.map((pillar) => (
-                  <span
-                    key={pillar.label}
-                    style={{
-                      width: `${pillar.percent}%`,
-                      background: pillar.color,
-                    }}
-                  />
-                ))}
-              </div>
-              <div className="social-pillar-list">
-                {pillars.map((pillar) => (
-                  <div key={pillar.label}>
-                    <i style={{ background: pillar.color }} />
-                    <span>{pillar.label}</span>
-                    <strong>{pillar.percent}%</strong>
-                  </div>
-                ))}
-              </div>
-            </aside>
           </section>
+          </>
+          )}
         </div>
       </main>
     </div>

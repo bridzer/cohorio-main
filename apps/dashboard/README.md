@@ -32,12 +32,13 @@ New Shopify public apps use expiring offline tokens. The API client refreshes
 tokens before expiry and stores Shopify's rotated refresh token in the same
 update.
 
-For local OAuth, `APP_URL` must be an HTTPS URL reachable by Shopify. Use an
-HTTPS tunnel and update the app and redirect URLs in Shopify's dashboard.
-`SHOPIFY_CLIENT_SECRET` is the Dev Dashboard client secret (often `shpss_…`),
-not a store access token (`shpat_`). Connecting a store starts with a
-same-origin POST so a crafted GET link cannot attach a shop to the signed-in
-workspace.
+Connecting a shop still requires a Dev Dashboard client secret, not an Admin
+API access token (`shpat_`, `shpua_`, or `shpca_`). Client secrets often start
+with `shpss_`. `APP_URL` must be HTTPS and must be a host that serves this
+dashboard, because Shopify redirects the merchant back to that URL. For local
+OAuth, use an HTTPS tunnel and update the app and redirect URLs in Shopify's
+dashboard. Connecting a store starts with a same-origin POST so a crafted GET
+link cannot attach a shop to the signed-in workspace.
 
 ## Security boundary
 
@@ -58,3 +59,18 @@ valid.
 
 Never expose Shopify tokens or `SHOPIFY_TOKEN_ENCRYPTION_KEY` to the browser.
 All Shopify API requests must remain in server routes or server jobs.
+
+## Language model
+
+Home playbooks, social generation, and lifecycle drafts call an
+OpenAI-compatible chat completions endpoint. Configure it with:
+
+- `COHORIO_LLM_API_KEY` — server-only bearer token. Leave it empty to fail
+  closed. Copilot and social generation return HTTP 400 with
+  `COHORIO_LLM_API_KEY is not configured.` and do not insert a row.
+- `COHORIO_LLM_BASE_URL` — API origin plus version path, for example
+  `https://api.groq.com/openai/v1` or `https://api.openai.com/v1`.
+- `COHORIO_LLM_MODEL` — model id accepted by that endpoint.
+
+Do not send `COHORIO_LLM_API_KEY` to the browser. Restart the dev server after
+changing these values; Next.js reads `.env.local` only at startup.

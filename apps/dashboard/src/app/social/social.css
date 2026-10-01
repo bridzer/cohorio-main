@@ -1195,3 +1195,47 @@
     overflow: hidden;
   }
 }
+
+.social-saved-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.social-saved-panel h2,
+.social-saved-panel h3 {
+  margin: 0;
+  color: #19241f;
+}
+
+.social-saved-panel p {
+  margin: 8px 0 0;
+  color: #667068;
+  white-space: pre-wrap;
+}
+
+.social-saved-panel article,
+.social-analytics-counts article {
+  padding: 16px;
+  border: 1px solid #e0e3de;
+  border-radius: 12px;
+  background: #fcfdfb;
+}
+
+.social-analytics-counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 160px));
+  gap: 12px;
+}
+
+.social-analytics-counts span {
+  display: block;
+  color: #7a837d;
+  font-size: 12px;
+}
+
+.social-analytics-counts strong {
+  display: block;
+  margin-top: 6px;
+  color: #19241f;
+  font-size: 28px;
+}

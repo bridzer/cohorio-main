@@ -37,6 +37,10 @@ export function socialGenerationPrompt(input: {
     .join("\n");
 }
 
+export function clipSocialPost(value: string, platform: SocialPlatform) {
+  return fit(value, PLATFORM_LIMITS[platform]);
+}
+
 function fit(value: string, maximum: number) {
   const normalized = value.replace(/\s+\n/g, "\n").trim();
   if (normalized.length <= maximum) return normalized;

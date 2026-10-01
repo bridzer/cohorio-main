@@ -116,6 +116,11 @@ export async function GET(
           inventoryUnits: overview.inventoryUnits,
         },
         daily,
+        series: overview.dailyMetrics.map((metric) => ({
+          date: metric.date.slice(0, 10),
+          revenue: metric.revenue,
+          ordersCount: metric.ordersCount,
+        })),
         products: overview.products,
       },
     });

@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { workspaceContextMarkdown } from "@/lib/marketing-context-prompt";
+import { completeChat } from "@/lib/llm/client";
+import { readSkillMarkdown } from "@/lib/skills/load-skill";
 import {
-  generateSocialPosts,
+  clipSocialPost,
   isSocialPlatform,
   type SocialPlatform,
 } from "@/lib/social/generate";
+import { insertSocialPost, type SocialPost } from "@/lib/social/repository";
 import {
   accessErrorResponse,
   requireWorkspaceAccess,
@@ -48,6 +51,9 @@ export async function POST(request: NextRequest) {
       503,
     );
   }
+  if (!process.env.COHORIO_LLM_API_KEY?.trim()) {
+    return errorResponse("COHORIO_LLM_API_KEY is not configured.", 400);
+  }
 
   try {
     assertSameOrigin(request);
@@ -63,16 +69,36 @@ export async function POST(request: NextRequest) {
     if (body.source.length > 20_000) {
       return errorResponse("Source content exceeds 20,000 characters.", 400);
     }
-    const tone =
-      typeof body.tone === "string" ? body.tone.trim().slice(0, 80) : undefined;
     const platforms = requestedPlatforms(body);
-    const posts = generateSocialPosts({
-      source: body.source,
-      platforms,
-      brandContextMarkdown: await workspaceContextMarkdown(workspaceId),
-      tone,
-    });
-    return NextResponse.json({ posts });
+    const [skillMarkdown, brandMarkdown] = await Promise.all([
+      readSkillMarkdown("social"),
+      workspaceContextMarkdown(workspaceId),
+    ]);
+    const drafts: Partial<Record<SocialPlatform, string>> = {};
+    const saved: SocialPost[] = [];
+    for (const platform of platforms) {
+      const output = await completeChat([
+        {
+          role: "system",
+          content: `${skillMarkdown}\n\n${brandMarkdown}\n\nWrite one ${platform} post. Return only the post text.`,
+        },
+        { role: "user", content: body.source.trim() },
+      ]);
+      drafts[platform] = clipSocialPost(output, platform);
+    }
+    for (const platform of platforms) {
+      const text = drafts[platform];
+      if (!text) continue;
+      saved.push(
+        await insertSocialPost({
+          workspaceId,
+          platform,
+          body: text,
+          sourcePrompt: body.source.trim(),
+        }),
+      );
+    }
+    return NextResponse.json({ posts: drafts, saved });
   } catch (error) {
     const originResponse = originErrorResponse(error);
     if (originResponse) return originResponse;
@@ -83,7 +109,11 @@ export async function POST(request: NextRequest) {
     }
     const message =
       error instanceof Error ? error.message : "Unable to generate posts.";
-    const status = error instanceof RangeError ? 400 : 503;
+    const status =
+      error instanceof RangeError ||
+      message === "COHORIO_LLM_API_KEY is not configured."
+        ? 400
+        : 503;
     return errorResponse(message, status);
   }
 }
