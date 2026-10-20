@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { updateSocialPost, type SocialPostStatus } from "@/lib/social/repository";
 import {
   accessErrorResponse,
@@ -45,17 +46,26 @@ export async function PATCH(
     }
     let scheduledFor: string | null = null;
     if (body.scheduledFor != null && body.scheduledFor !== "") {
-      if (typeof body.scheduledFor !== "string" || Number.isNaN(Date.parse(body.scheduledFor))) {
+      if (!z.iso.datetime({ offset: true }).safeParse(body.scheduledFor).success) {
         return errorResponse("scheduledFor must be an ISO date.", 400);
       }
-      scheduledFor = new Date(body.scheduledFor).toISOString();
+      scheduledFor = new Date(body.scheduledFor as string).toISOString();
     }
     if (body.status === "scheduled" && !scheduledFor) {
       return errorResponse("A scheduled post needs a date.", 400);
     }
+    if (body.status === "scheduled" && Date.parse(scheduledFor!) <= Date.now()) {
+      return errorResponse("Choose a future date and time.", 400);
+    }
+    if (body.body !== undefined && (
+      typeof body.body !== "string" || !body.body.trim() || body.body.length > 20_000
+    )) {
+      return errorResponse("Post text must contain 1 to 20,000 characters.", 400);
+    }
     const post = await updateSocialPost(workspaceId, id, {
       status: body.status as SocialPostStatus,
       scheduledFor,
+      ...(typeof body.body === "string" ? { body: body.body.trim() } : {}),
     });
     if (!post) {
       return errorResponse("Post not found.", 404);

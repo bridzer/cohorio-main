@@ -6,6 +6,7 @@ import {
   listCopilotRuns,
 } from "@/lib/copilot-repository";
 import { completeChat } from "@/lib/llm/client";
+import { brandBrainMessages } from "@/lib/brand-brain-messages";
 import { resolvePlaybook } from "@/lib/skills/catalog";
 import { readSkillMarkdown } from "@/lib/skills/load-skill";
 import {
@@ -16,6 +17,11 @@ import {
   assertSameOrigin,
   originErrorResponse,
 } from "@/lib/auth/request";
+import {
+  assertTaskQuota,
+  quotaErrorResponse,
+  recordTaskEvent,
+} from "@/lib/billing/quota";
 
 export const runtime = "nodejs";
 
@@ -34,7 +40,19 @@ export async function GET() {
   }
   try {
     const workspaceId = (await requireWorkspaceAccess("viewer")).workspaceId;
-    return NextResponse.json({ runs: await listCopilotRuns(workspaceId) });
+    const runs = (await listCopilotRuns(workspaceId)).map((run) => {
+      const firstLine = run.prompt.split("\n")[0] ?? "";
+      const title = firstLine.startsWith("Workspace: ")
+        ? firstLine.slice("Workspace: ".length).trim() || "Brand Brain"
+        : "Brand Brain";
+      return {
+        id: run.id,
+        title,
+        output: run.output,
+        created_at: run.created_at,
+      };
+    });
+    return NextResponse.json({ runs });
   } catch (error) {
     const accessResponse = accessErrorResponse(error);
     if (accessResponse) return accessResponse;
@@ -55,18 +73,19 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return errorResponse("A playbook and a prompt are required.", 400);
     }
-    const playbook = resolvePlaybook(parsed.data.skillId);
+    const playbook = await resolvePlaybook(parsed.data.skillId);
+    await assertTaskQuota(access.workspaceId);
     const [skillMarkdown, brandMarkdown] = await Promise.all([
       readSkillMarkdown(playbook.directory),
       workspaceContextMarkdown(access.workspaceId),
     ]);
-    const output = await completeChat([
-      {
-        role: "system",
-        content: `${skillMarkdown}\n\n${brandMarkdown}`,
-      },
-      { role: "user", content: parsed.data.prompt },
-    ]);
+    const output = await completeChat(
+      brandBrainMessages({
+        skillMarkdown,
+        brandMarkdown,
+        prompt: parsed.data.prompt,
+      }),
+    );
     const run = await insertCopilotRun({
       workspaceId: access.workspaceId,
       userId: access.userId,
@@ -74,10 +93,23 @@ export async function POST(request: NextRequest) {
       prompt: parsed.data.prompt,
       output,
     });
-    return NextResponse.json({ run }, { status: 201 });
+    await recordTaskEvent(access.workspaceId, "copilot");
+    return NextResponse.json(
+      {
+        run: {
+          id: run.id,
+          title: "Brand Brain",
+          output: run.output,
+          created_at: run.created_at,
+        },
+      },
+      { status: 201 },
+    );
   } catch (error) {
     const originResponse = originErrorResponse(error);
     if (originResponse) return originResponse;
+    const quotaResponse = quotaErrorResponse(error);
+    if (quotaResponse) return quotaResponse;
     const accessResponse = accessErrorResponse(error);
     if (accessResponse) return accessResponse;
     if (error instanceof SyntaxError) {

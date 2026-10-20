@@ -216,56 +216,75 @@ You can also invoke skills directly:
 
 ## Skill Categories
 
+Each skill directory belongs to one category.
+
 ### Conversion Optimization
-- `page-cro` - Any marketing page
-- `signup-flow-cro` - Registration flows
-- `onboarding-cro` - Post-signup activation
-- `form-cro` - Lead capture forms
-- `popup-cro` - Modals and overlays
-- `paywall-upgrade-cro` - In-app upgrade moments
+- `cro` - Any marketing page
+- `signup` - Registration and trial flows
+- `onboarding` - Post-signup activation
+- `form` - Lead, contact, and non-signup forms
+- `popups` - Modals and overlays
+- `paywalls` - In-app upgrade moments
 
 ### Content & Copy
 - `copywriting` - Marketing page copy
 - `copy-editing` - Edit and polish existing copy
 - `cold-email` - B2B cold outreach emails and sequences
-- `email-sequence` - Automated email flows
-- `social-content` - Social media content
-- `image` - AI image generation, design tools, and optimization
+- `emails` - Automated email flows
+- `sms` - SMS and MMS programs
+- `social` - Social media content
+- `content-strategy` - Topics, clusters, and editorial planning
+- `lead-magnets` - Downloadable lead magnets
+- `image` - Marketing image generation and optimization
+- `video` - AI and programmatic video
 
 ### SEO & Discovery
 - `seo-audit` - Technical and on-page SEO
-- `ai-seo` - AI search optimization (AEO, GEO, LLMO)
+- `ai-seo` - AI search optimization
 - `programmatic-seo` - Scaled page generation
-- `site-architecture` - Page hierarchy, navigation, URL structure
-- `competitor-alternatives` - Comparison and alternative pages
-- `schema-markup` - Structured data
+- `site-architecture` - Page hierarchy, navigation, and URLs
+- `competitors` - Comparison and alternative pages
+- `schema` - Structured data
+- `aso` - App Store and Google Play listings
+- `directory-submissions` - Startup, SaaS, and review directories
 
 ### Paid & Distribution
-- `paid-ads` - Google, Meta, LinkedIn ad campaigns
+- `ads` - Google, Meta, LinkedIn, and other paid campaigns
 - `ad-creative` - Bulk ad creative generation and iteration
-- `social-content` - Social media scheduling and strategy
+- `influencer-marketing` - Creator and ambassador programs
+- `public-relations` - Earned media and press outreach
 
 ### Measurement & Testing
-- `analytics-tracking` - Event tracking setup
-- `ab-test-setup` - Experiment design
+- `analytics` - Event tracking setup
+- `ab-testing` - Experiment design
+- `attribution` - Which marketing drives revenue
 
 ### Retention
-- `churn-prevention` - Cancel flows, save offers, dunning, payment recovery
+- `churn-prevention` - Cancel flows, save offers, dunning, and payment recovery
 
 ### Growth Engineering
 - `co-marketing` - Partner identification and joint campaigns
-- `free-tool-strategy` - Marketing tools and calculators
-- `referral-program` - Referral and affiliate programs
+- `free-tools` - Marketing tools and calculators
+- `referrals` - Referral and affiliate programs
+- `community-marketing` - Community programs
+- `marketing-loops` - Recurring marketing workflows
 
 ### Strategy & Monetization
-- `marketing-ideas` - 140 SaaS marketing ideas
+- `product-marketing` - Foundational product marketing context
+- `marketing-ideas` - SaaS marketing ideas
 - `marketing-psychology` - Mental models and psychology
-- `launch-strategy` - Product launches and announcements
-- `pricing-strategy` - Pricing, packaging, and monetization
+- `marketing-plan` - Full marketing plans
+- `marketing-council` - Multiple expert perspectives
+- `launch` - Product launches and announcements
+- `pricing` - Pricing, packaging, and monetization
+- `offers` - Offer design and value framing
+- `customer-research` - Interviews, surveys, and voice of customer
+- `competitor-profiling` - Competitor research from URLs
 
 ### Sales & RevOps
-- `revops` - Lead lifecycle, scoring, routing, pipeline management
-- `sales-enablement` - Sales decks, one-pagers, objection docs, demo scripts
+- `revops` - Lead lifecycle, scoring, routing, and pipeline management
+- `sales-enablement` - Sales decks, one-pagers, objection docs, and demo scripts
+- `prospecting` - Prospect lists and qualification
 
 ## Contributing
 

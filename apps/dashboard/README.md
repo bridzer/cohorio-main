@@ -74,3 +74,31 @@ OpenAI-compatible chat completions endpoint. Configure it with:
 
 Do not send `COHORIO_LLM_API_KEY` to the browser. Restart the dev server after
 changing these values; Next.js reads `.env.local` only at startup.
+
+## Brand Brain responses
+
+Both `/api/workspaces/run` and `/api/copilot/runs` load the signed-in
+workspace's latest saved Brand Brain on each request. Shared dashboard
+instructions adapt the marketing skills to this application: use saved product,
+audience and voice, produce the requested work when possible, and ask at most
+two questions only when missing details block useful work. Context is passed as
+reference data separately from system instructions. Generation does not update
+Brand Brain or publish content.
+
+Regression tests exercise both routes with the real ad-creative skill and mocked
+database/model boundaries, including workspace changes and missing context.
+They verify model inputs and persistence, not the quality of a live model's reply.
+For a live quality check, save a product one-liner, audience and voice, then ask:
+`Write three Meta feed ads for our product. Do not include a discount.`
+The response should give three ads grounded in those facts without asking for
+the saved information, inventing proof, or adding a discount. With no saved
+context, it should identify the missing product information without inventing it.
+
+## Social scheduling
+
+Choose a date and time in Social Studio using the timezone shown beside the
+picker (your browser's timezone). Scheduling saves the current edited copy and
+selected time together. The calendar groups entries in that same timezone and
+shows their times. You can change the time and reschedule the current post.
+Past dates and timestamps without a timezone are rejected by the API.
+Scheduling stores a calendar plan; automatic social publishing is not connected.

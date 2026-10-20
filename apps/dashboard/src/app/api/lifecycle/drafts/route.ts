@@ -14,6 +14,11 @@ import {
   assertSameOrigin,
   originErrorResponse,
 } from "@/lib/auth/request";
+import {
+  assertTaskQuota,
+  quotaErrorResponse,
+  recordTaskEvent,
+} from "@/lib/billing/quota";
 
 export const runtime = "nodejs";
 
@@ -63,14 +68,22 @@ export async function POST(request: NextRequest) {
         return errorResponse("Shopify connection not found.", 404);
       }
     }
+    if (process.env.COHORIO_LLM_API_KEY?.trim()) {
+      await assertTaskQuota(workspaceId);
+    }
     const drafts = await insertLifecycleDrafts(
       workspaceId,
       await buildLifecycleDrafts(await workspaceContextMarkdown(workspaceId)),
     );
+    if (process.env.COHORIO_LLM_API_KEY?.trim()) {
+      await recordTaskEvent(workspaceId, "lifecycle");
+    }
     return NextResponse.json({ drafts }, { status: 201 });
   } catch (error) {
     const originResponse = originErrorResponse(error);
     if (originResponse) return originResponse;
+    const quotaResponse = quotaErrorResponse(error);
+    if (quotaResponse) return quotaResponse;
     const accessResponse = accessErrorResponse(error);
     if (accessResponse) return accessResponse;
     const message =

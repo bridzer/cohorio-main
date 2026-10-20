@@ -1,12 +1,43 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { accountInitials, useAccount } from "@/lib/use-account";
+import { localScheduleToIso, scheduleDay } from "@/lib/social/schedule";
 import "./social.css";
 
 type Platform = "LinkedIn" | "X" | "Instagram";
 type View = "Create" | "Calendar" | "Library" | "Analytics";
+
+const subscribeTimezone = () => () => {};
+const browserTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+const defaultSocialSource =
+  "One shared brand brain turns scattered product knowledge into consistent marketing. Teams can create faster without losing their voice.";
+
+let handedOffSocialSource = "";
+
+function subscribeHandedOffSocialSource(onStoreChange: () => void) {
+  const stored = sessionStorage.getItem("cohorio-social-source");
+  if (!stored) return () => {};
+  sessionStorage.removeItem("cohorio-social-source");
+  if (stored !== handedOffSocialSource) {
+    handedOffSocialSource = stored;
+    queueMicrotask(onStoreChange);
+  }
+  return () => {};
+}
+
+function handedOffSocialSourceSnapshot() {
+  return handedOffSocialSource;
+}
 
 function Glyph({
   children,
@@ -156,12 +187,18 @@ export default function SocialStudio() {
   ]);
   const [activePlatform, setActivePlatform] =
     useState<Platform>("LinkedIn");
-  const [source, setSource] = useState(
-    "One shared brand brain turns scattered product knowledge into consistent marketing. Teams can create faster without losing their voice.",
+  const handedOffSource = useSyncExternalStore(
+    subscribeHandedOffSocialSource,
+    handedOffSocialSourceSnapshot,
+    () => "",
   );
+  const [sourceDraft, setSourceDraft] = useState<string | null>(null);
+  const source = sourceDraft ?? (handedOffSource || defaultSocialSource);
   const [posts, setPosts] = useState(emptyPosts);
+  const [goal, setGoal] = useState("Build authority");
   const [tone, setTone] = useState("Clear & insightful");
-  const [scheduled, setScheduled] = useState(false);
+  const [scheduleTime, setScheduleTime] = useState("");
+  const timeZone = useSyncExternalStore(subscribeTimezone, browserTimezone, () => "UTC");
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState("");
   const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
@@ -222,7 +259,6 @@ export default function SocialStudio() {
     if (!source.trim() || generating) return;
     setGenerating(true);
     setGenerateError("");
-    setScheduled(false);
     try {
       const response = await fetch("/api/social/generate", {
         method: "POST",
@@ -231,7 +267,8 @@ export default function SocialStudio() {
         body: JSON.stringify({
           source: source.trim(),
           platforms: selectedPlatforms,
-          tone,
+          goal,
+          voice: tone,
         }),
       });
       const payload = (await response.json()) as {
@@ -306,6 +343,7 @@ export default function SocialStudio() {
     setSaving(true);
     setGenerateError("");
     try {
+      const scheduledFor = localScheduleToIso(scheduleTime);
       let id = postIds[activePlatform];
       if (!id) {
         if (!activePost.trim()) return;
@@ -328,17 +366,16 @@ export default function SocialStudio() {
         }
         id = createdPayload.post.id;
         setSavedPosts((current) => [createdPayload.post!, ...current]);
+        setPostIds((current) => ({ ...current, [activePlatform]: id }));
       }
-      const when = new Date();
-      when.setDate(when.getDate() + 1);
-      when.setHours(10, 0, 0, 0);
       const response = await fetch(`/api/social/posts/${id}`, {
         method: "PATCH",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           status: "scheduled",
-          scheduledFor: when.toISOString(),
+          scheduledFor,
+          body: activePost,
         }),
       });
       const payload = (await response.json()) as {
@@ -356,7 +393,6 @@ export default function SocialStudio() {
         ...current,
         [activePlatform]: payload.post!.id,
       }));
-      setScheduled(true);
     } catch (error) {
       setGenerateError(
         error instanceof Error ? error.message : "Unable to schedule this post.",
@@ -369,14 +405,18 @@ export default function SocialStudio() {
   const calendarGroups = useMemo(() => {
     const groups = new Map<string, SavedPost[]>();
     for (const post of savedPosts) {
-      if (!post.scheduledFor) continue;
-      const day = post.scheduledFor.slice(0, 10);
+      if (post.status !== "scheduled" || !post.scheduledFor) continue;
+      const day = scheduleDay(post.scheduledFor, timeZone);
       groups.set(day, [...(groups.get(day) ?? []), post]);
     }
     return [...groups.entries()].sort(([left], [right]) =>
       left.localeCompare(right),
     );
-  }, [savedPosts]);
+  }, [savedPosts, timeZone]);
+
+  const activeScheduledPost = savedPosts.find(
+    (post) => post.id === postIds[activePlatform] && post.status === "scheduled",
+  );
 
   return (
     <div className="social-shell">
@@ -479,6 +519,7 @@ export default function SocialStudio() {
           {view === "Calendar" ? (
             <section className="social-saved-panel">
               <h2>Calendar</h2>
+              <p>Times shown in {timeZone}. Scheduling saves your plan; posts are not automatically published.</p>
               {calendarGroups.length ? (
                 calendarGroups.map(([day, postsForDay]) => (
                   <div key={day} className="social-saved-group">
@@ -493,6 +534,9 @@ export default function SocialStudio() {
                     {postsForDay.map((post) => (
                       <article key={post.id}>
                         <strong>{post.platform}</strong>
+                        <p>{new Intl.DateTimeFormat("en-US", {
+                          timeZone, hour: "numeric", minute: "2-digit", timeZoneName: "short",
+                        }).format(new Date(post.scheduledFor!))}</p>
                         <p>{post.body}</p>
                       </article>
                     ))}
@@ -564,18 +608,10 @@ export default function SocialStudio() {
                   <textarea
                     aria-label="Source content"
                     value={source}
-                    onChange={(event) => setSource(event.target.value)}
+                    onChange={(event) => setSourceDraft(event.target.value)}
                     placeholder="Paste a blog URL, transcript, newsletter, or rough idea..."
                   />
                   <div className="social-source-actions">
-                    <button type="button">
-                      <Glyph size={15}>{icons.link}</Glyph>
-                      Add URL
-                    </button>
-                    <button type="button">
-                      <Glyph size={15}>{icons.upload}</Glyph>
-                      Upload
-                    </button>
                     <span>{source.length} characters</span>
                   </div>
                 </div>
@@ -609,7 +645,7 @@ export default function SocialStudio() {
                 <div className="social-two-fields">
                   <label>
                     Goal
-                    <select defaultValue="Build authority">
+                    <select value={goal} onChange={(event) => setGoal(event.target.value)}>
                       <option>Build authority</option>
                       <option>Drive engagement</option>
                       <option>Generate leads</option>
@@ -710,16 +746,6 @@ export default function SocialStudio() {
                     }))
                   }
                 />
-                <button className="social-add-visual">
-                  <span>
-                    <Glyph size={19}>{icons.image}</Glyph>
-                  </span>
-                  <div>
-                    <strong>Add a visual</strong>
-                    <small>Generate a carousel, image, or quote card</small>
-                  </div>
-                  <Glyph size={16}>{icons.chevron}</Glyph>
-                </button>
                 <div className="social-post-meta">
                   <span>Voice: {tone}</span>
                   <span className={charCount > currentLimit ? "over" : ""}>
@@ -728,6 +754,22 @@ export default function SocialStudio() {
                 </div>
               </div>
 
+              <div className="social-schedule-picker">
+                <label htmlFor="social-schedule-time">Schedule date and time ({timeZone})</label>
+                <input
+                  id="social-schedule-time"
+                  type="datetime-local"
+                  value={scheduleTime}
+                  onChange={(event) => setScheduleTime(event.target.value)}
+                  disabled={saving}
+                />
+                <p>Saved to your calendar. Automatic publishing is not connected.</p>
+                {activeScheduledPost?.scheduledFor && (
+                  <p role="status">Scheduled for {new Intl.DateTimeFormat("en-US", {
+                    timeZone, dateStyle: "medium", timeStyle: "short",
+                  }).format(new Date(activeScheduledPost.scheduledFor))} ({timeZone})</p>
+                )}
+              </div>
               <div className="social-preview-actions">
                 <button
                   className="social-secondary"
@@ -738,15 +780,15 @@ export default function SocialStudio() {
                   {saving ? "Saving..." : "Save draft"}
                 </button>
                 <button
-                  className={`social-schedule ${scheduled ? "scheduled" : ""}`}
+                  className={`social-schedule ${activeScheduledPost ? "scheduled" : ""}`}
                   type="button"
-                  disabled={saving}
+                  disabled={saving || !scheduleTime || !activePost.trim()}
                   onClick={() => void scheduleActivePost()}
                 >
                   <Glyph size={16}>
-                    {scheduled ? icons.check : icons.calendar}
+                    {activeScheduledPost ? icons.check : icons.calendar}
                   </Glyph>
-                  {scheduled ? "Scheduled for tomorrow, 10:00" : "Schedule post"}
+                  {saving ? "Saving..." : activeScheduledPost ? "Reschedule post" : "Schedule post"}
                 </button>
               </div>
             </div>

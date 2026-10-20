@@ -1,6 +1,15 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { routeCopilotRequest } from "@/lib/copilot-route";
+import {
+  BRAND_BRAIN,
+  FEATURE_WORKSPACES,
+  INTELLIGENCE,
+  findJob,
+  type WorkspaceDefinition,
+  type WorkspaceJob,
+} from "@/lib/workspaces";
 import { useRouter } from "next/navigation";
 
 type IconName =
@@ -166,64 +175,6 @@ const navItems: { label: string; icon: IconName }[] = [
   { label: "Commerce", icon: "bag" },
 ];
 
-const tasks: {
-  title: string;
-  description: string;
-  icon: IconName;
-  category: string;
-  tone: string;
-  skill: string;
-}[] = [
-  {
-    title: "Create social content",
-    description: "Turn one idea into platform-ready posts that sound like your brand.",
-    icon: "social",
-    category: "Content",
-    tone: "coral",
-    skill: "social-content",
-  },
-  {
-    title: "Generate ad creative",
-    description: "Build and test campaign angles, headlines, and variations at scale.",
-    icon: "ads",
-    category: "Ads",
-    tone: "violet",
-    skill: "ad-creative",
-  },
-  {
-    title: "Write conversion copy",
-    description: "Create clear, persuasive copy for landing pages and product launches.",
-    icon: "copy",
-    category: "Content",
-    tone: "blue",
-    skill: "copywriting",
-  },
-  {
-    title: "Audit a landing page",
-    description: "Find the friction, weak claims, and missed opportunities hurting conversion.",
-    icon: "target",
-    category: "Optimize",
-    tone: "lime",
-    skill: "page-cro",
-  },
-  {
-    title: "Plan an email sequence",
-    description: "Map a welcome, nurture, launch, or win-back flow from goal to send.",
-    icon: "mail",
-    category: "Lifecycle",
-    tone: "amber",
-    skill: "email-sequence",
-  },
-  {
-    title: "Run an SEO audit",
-    description: "Prioritize technical, on-page, and content fixes with the highest impact.",
-    icon: "search",
-    category: "Optimize",
-    tone: "cyan",
-    skill: "seo-audit",
-  },
-];
-
 type DashboardAccount = {
   user: { name?: string | null; email?: string | null };
   access: {
@@ -233,12 +184,108 @@ type DashboardAccount = {
   };
 };
 
+type WorkspaceAsset = {
+  type: "copilot" | "social" | "lifecycle" | "campaign";
+  id: string;
+  title: string;
+  createdAt: string;
+  href: string;
+};
+
 type CopilotRun = {
   id: string;
-  skill_id: string;
+  title: string;
   output: string;
   created_at: string;
 };
+
+const ASSET_LABEL = {
+  copilot: "Copy",
+  social: "Social",
+  lifecycle: "Email",
+  campaign: "Campaign",
+} as const;
+
+function WorkspaceForm({
+  workspace,
+  running,
+  output,
+  onRun,
+}: {
+  workspace: WorkspaceDefinition;
+  running: boolean;
+  output: string;
+  onRun: (job: WorkspaceJob, answers: Record<string, string>) => void;
+}) {
+  const [jobId, setJobId] = useState(workspace.jobs[0]?.id ?? "");
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const job =
+    workspace.jobs.find((item) => item.id === jobId) ?? workspace.jobs[0];
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!job || running) return;
+    onRun(job, answers);
+  }
+
+  if (!job) return null;
+
+  return (
+    <form className="workspace-form" onSubmit={submit}>
+      <label>
+        Request
+        <select
+          aria-label={`${workspace.name} request`}
+          value={job.id}
+          onChange={(event) => setJobId(event.target.value)}
+        >
+          {workspace.jobs.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="workspace-job-detail">{job.detail}</p>
+      {job.fields.map((field) => (
+        <label key={field.id}>
+          {field.label}
+          {field.multiline ? (
+            <textarea
+              aria-label={field.label}
+              required={field.required}
+              placeholder={field.placeholder}
+              value={answers[field.id] ?? ""}
+              onChange={(event) =>
+                setAnswers((current) => ({
+                  ...current,
+                  [field.id]: event.target.value,
+                }))
+              }
+            />
+          ) : (
+            <input
+              aria-label={field.label}
+              required={field.required}
+              placeholder={field.placeholder}
+              value={answers[field.id] ?? ""}
+              onChange={(event) =>
+                setAnswers((current) => ({
+                  ...current,
+                  [field.id]: event.target.value,
+                }))
+              }
+            />
+          )}
+        </label>
+      ))}
+      <button className="primary-action" type="submit" disabled={running}>
+        {running ? "Working" : "Run"}
+      </button>
+      {output ? <p className="workspace-output">{output}</p> : null}
+    </form>
+  );
+}
 
 function subscribeToToday() {
   return () => {};
@@ -255,19 +302,26 @@ function todayLabelSnapshot() {
 export default function Home() {
   const router = useRouter();
   const [activeNav, setActiveNav] = useState("Overview");
-  const [filter, setFilter] = useState("All");
+  const [category, setCategory] = useState("All");
   const [prompt, setPrompt] = useState("");
+  const [openWorkspaceId, setOpenWorkspaceId] = useState(
+    FEATURE_WORKSPACES[0]?.id ?? "",
+  );
+  const [activeOutput, setActiveOutput] = useState<{
+    workspaceId: string;
+    text: string;
+  } | null>(null);
   const [brandBrainProgress, setBrandBrainProgress] = useState(0);
   const [account, setAccount] = useState<DashboardAccount | null>(null);
   const [assistantMessage, setAssistantMessage] = useState(
-    "What are we working on today?",
+    "What should Brand Brain work from?",
   );
   const todayLabel = useSyncExternalStore(
     subscribeToToday,
     todayLabelSnapshot,
     () => "",
   );
-  const [copilotRuns, setCopilotRuns] = useState<CopilotRun[]>([]);
+  const [assets, setAssets] = useState<WorkspaceAsset[]>([]);
   const [running, setRunning] = useState(false);
 
   useEffect(() => {
@@ -312,10 +366,10 @@ export default function Home() {
     let cancelled = false;
     void (async () => {
       try {
-        const response = await fetch("/api/copilot/runs", { cache: "no-store" });
+        const response = await fetch("/api/assets", { cache: "no-store" });
         if (!response.ok) return;
-        const data = (await response.json()) as { runs?: CopilotRun[] };
-        if (!cancelled) setCopilotRuns(data.runs ?? []);
+        const data = (await response.json()) as { assets?: WorkspaceAsset[] };
+        if (!cancelled) setAssets(data.assets ?? []);
       } catch {
         // Recent work stays empty until the runs API is available.
       }
@@ -332,44 +386,67 @@ export default function Home() {
     .map((part) => part[0]?.toUpperCase())
     .join("");
 
-  const filteredTasks = useMemo(
+  const visibleWorkspaces = useMemo(
     () =>
-      filter === "All" ? tasks : tasks.filter((task) => task.category === filter),
-    [filter],
+      category === "All"
+        ? FEATURE_WORKSPACES
+        : FEATURE_WORKSPACES.filter((workspace) => workspace.name === category),
+    [category],
   );
-  const copilotRunsKey = (run: CopilotRun) => run.id;
-
-  async function refreshRuns() {
-    const response = await fetch("/api/copilot/runs", { cache: "no-store" });
+  const openWorkspace =
+    visibleWorkspaces.find((workspace) => workspace.id === openWorkspaceId) ??
+    visibleWorkspaces[0] ??
+    null;
+  async function refreshAssets() {
+    const response = await fetch("/api/assets", { cache: "no-store" });
     if (!response.ok) return;
-    const data = (await response.json()) as { runs?: CopilotRun[] };
-    setCopilotRuns(data.runs ?? []);
+    const data = (await response.json()) as { assets?: WorkspaceAsset[] };
+    setAssets(data.assets ?? []);
   }
 
-  async function runPlaybook(skillId: string, playbookPrompt: string) {
+  async function runWorkspace(
+    workspace: WorkspaceDefinition,
+    job: WorkspaceJob,
+    answers: Record<string, string>,
+    prompt?: string,
+  ) {
+    if (workspace.id === "content" && job.id === "social") {
+      const source = answers.source?.trim();
+      if (source) sessionStorage.setItem("cohorio-social-source", source);
+      router.push("/social");
+      return;
+    }
     setRunning(true);
     setActiveNav("Ask Cohorio");
-    setAssistantMessage("Working through that playbook...");
+    setAssistantMessage("Working from your brand context...");
+    setActiveOutput(null);
     try {
-      const response = await fetch("/api/copilot/runs", {
+      const response = await fetch("/api/workspaces/run", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ skillId, prompt: playbookPrompt }),
+        body: JSON.stringify({
+          workspaceId: workspace.id,
+          jobId: job.id,
+          answers,
+          prompt,
+        }),
       });
       const payload = (await response.json()) as {
         run?: CopilotRun;
         error?: string;
       };
       if (!response.ok || !payload.run) {
-        throw new Error(payload.error || "Unable to run this playbook.");
+        throw new Error(payload.error || "Unable to run this workspace.");
       }
       setAssistantMessage(payload.run.output);
-      await refreshRuns();
+      setActiveOutput({ workspaceId: workspace.id, text: payload.run.output });
+      await refreshAssets();
     } catch (error) {
-      setAssistantMessage(
-        error instanceof Error ? error.message : "Unable to run this playbook.",
-      );
+      const message =
+        error instanceof Error ? error.message : "Unable to run this workspace.";
+      setAssistantMessage(message);
+      setActiveOutput({ workspaceId: workspace.id, text: message });
     } finally {
       setRunning(false);
     }
@@ -380,16 +457,18 @@ export default function Home() {
     const cleanPrompt = prompt.trim();
     if (!cleanPrompt || running) return;
     setPrompt("");
-    void runPlaybook("copywriting", cleanPrompt);
-  }
-
-  function selectTask(task: (typeof tasks)[number]) {
-    if (task.skill === "social-content") {
+    const route = routeCopilotRequest(cleanPrompt);
+    if (route.workspaceId === "content" && route.jobId === "social") {
+      sessionStorage.setItem("cohorio-social-source", cleanPrompt);
       router.push("/social");
       return;
     }
-    if (running) return;
-    void runPlaybook(task.skill, `${task.title}\n${task.description}`);
+    const match = findJob(route.workspaceId, route.jobId) ?? {
+      workspace: BRAND_BRAIN,
+      job: BRAND_BRAIN.jobs[0],
+    };
+    if (!match.job) return;
+    void runWorkspace(match.workspace, match.job, {}, cleanPrompt);
   }
 
   return (
@@ -424,6 +503,10 @@ export default function Home() {
               onClick={() => {
                 if (item.label === "Commerce") {
                   router.push("/commerce");
+                  return;
+                }
+                if (item.label === "Assets") {
+                  router.push("/library");
                   return;
                 }
                 setActiveNav(item.label);
@@ -504,25 +587,31 @@ export default function Home() {
               <div className="section-heading">
                 <div>
                   <h2>Assets</h2>
-                  <p>Outputs from Ask Cohorio, with skill and time saved.</p>
+                  <p>Saved work from Brand Brain and the workspaces.</p>
                 </div>
               </div>
-              {copilotRuns.length === 0 ? (
-                <p className="activity-empty">No runs yet</p>
+              {assets.length === 0 ? (
+                <p className="activity-empty">No saved assets.</p>
               ) : (
                 <div className="activity-list">
-                  {copilotRuns.map((run) => (
-                    <div className="activity-row" key={copilotRunsKey(run)}>
+                  {assets.map((asset) => (
+                    <button
+                      className="activity-row"
+                      key={`${asset.type}:${asset.id}`}
+                      type="button"
+                      onClick={() => router.push(asset.href)}
+                    >
                       <span className="activity-copy">
-                        <strong>{run.skill_id}</strong>
+                        <strong>{asset.title}</strong>
                         <span>
+                          {ASSET_LABEL[asset.type]} ·{" "}
                           {new Intl.DateTimeFormat("en-US", {
                             dateStyle: "medium",
                             timeStyle: "short",
-                          }).format(new Date(run.created_at))}
+                          }).format(new Date(asset.createdAt))}
                         </span>
                       </span>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -583,32 +672,33 @@ export default function Home() {
               <Icon name="spark" size={23} />
             </div>
             <div className="copilot-copy">
-              <span className="copilot-label">Cohorio co-pilot</span>
+              <span className="copilot-label">Cohorio Co-Pilot · Brand Brain</span>
               <h2>{assistantMessage}</h2>
               <p>
-                Ask for a campaign, audit, sequence, strategy, or anything else
-                on your marketing list.
+                Ask for a homepage audit, a welcome email sequence, ad
+                headlines, or a question about your product. Co-Pilot uses your
+                saved brand context.
               </p>
               <form onSubmit={submitPrompt}>
                 <input
-                  aria-label="Ask Cohorio"
+                  aria-label="Ask Brand Brain"
                   value={prompt}
                   onChange={(event) => setPrompt(event.target.value)}
-                  placeholder="Try “Turn our latest blog post into a LinkedIn campaign”"
+                  placeholder="Ask from your product, audience, and voice"
                 />
                 <button type="submit" aria-label="Send prompt" disabled={running}>
                   <Icon name="send" size={18} />
                 </button>
               </form>
               <div className="quick-prompts">
-                <button onClick={() => setPrompt("Plan this week’s social content")}>
-                  Plan my week
+                <button onClick={() => setPrompt("How should we describe the product in one line?")}>
+                  Product line
                 </button>
-                <button onClick={() => setPrompt("Review my homepage positioning")}>
-                  Review my homepage
+                <button onClick={() => setPrompt("Who is this for, and who is it not for?")}>
+                  Audience
                 </button>
-                <button onClick={() => setPrompt("Find my highest-impact marketing task")}>
-                  What should I do next?
+                <button onClick={() => setPrompt("What should we sound like?")}>
+                  Voice
                 </button>
               </div>
             </div>
@@ -628,37 +718,65 @@ export default function Home() {
             </div>
           </section>
 
+          <section className="workspace-panel-card">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Main engine</p>
+                <h2>Cohorio Intelligence</h2>
+                <p>{INTELLIGENCE.summary}</p>
+              </div>
+            </div>
+            <WorkspaceForm
+              workspace={INTELLIGENCE}
+              running={running}
+              output={
+                activeOutput?.workspaceId === INTELLIGENCE.id
+                  ? activeOutput.text
+                  : ""
+              }
+              onRun={(job, answers) => {
+                void runWorkspace(INTELLIGENCE, job, answers);
+              }}
+            />
+          </section>
+
           <section className="tasks-section">
             <div className="section-heading">
               <div>
-                <h2>Start with a playbook</h2>
-                <p>Expert workflows, grounded in your brand context.</p>
+                <h2>Workspaces</h2>
+                <p>Each workspace collects the inputs for that kind of work.</p>
               </div>
-              <div className="filters" aria-label="Task filters">
-                {["All", "Content", "Ads", "Optimize", "Lifecycle"].map((item) => (
-                  <button
-                    key={item}
-                    className={filter === item ? "active" : ""}
-                    onClick={() => setFilter(item)}
-                  >
-                    {item}
-                  </button>
-                ))}
+              <div className="filters" aria-label="Workspaces">
+                {["All", ...FEATURE_WORKSPACES.map((workspace) => workspace.name)].map(
+                  (item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      className={category === item ? "active" : ""}
+                      onClick={() => setCategory(item)}
+                    >
+                      {item}
+                    </button>
+                  ),
+                )}
               </div>
             </div>
             <div className="task-grid">
-              {filteredTasks.map((task) => (
+              {visibleWorkspaces.map((workspace) => (
                 <button
-                  className="task-card"
-                  key={task.title}
-                  onClick={() => selectTask(task)}
+                  className={`task-card ${
+                    openWorkspace?.id === workspace.id ? "selected" : ""
+                  }`}
+                  key={workspace.id}
+                  type="button"
+                  onClick={() => setOpenWorkspaceId(workspace.id)}
                 >
-                  <span className={`task-icon ${task.tone}`}>
-                    <Icon name={task.icon} size={22} />
+                  <span className="task-icon blue">
+                    <Icon name="spark" size={22} />
                   </span>
                   <span className="task-copy">
-                    <strong>{task.title}</strong>
-                    <span>{task.description}</span>
+                    <strong>{workspace.name}</strong>
+                    <span>{workspace.summary}</span>
                   </span>
                   <span className="task-arrow">
                     <Icon name="arrow" size={17} />
@@ -666,6 +784,24 @@ export default function Home() {
                 </button>
               ))}
             </div>
+            {openWorkspace ? (
+              <div className="workspace-panel-card">
+                <h3>{openWorkspace.name}</h3>
+                <WorkspaceForm
+                  key={openWorkspace.id}
+                  workspace={openWorkspace}
+                  running={running}
+                  output={
+                    activeOutput?.workspaceId === openWorkspace.id
+                      ? activeOutput.text
+                      : ""
+                  }
+                  onRun={(job, answers) => {
+                    void runWorkspace(openWorkspace, job, answers);
+                  }}
+                />
+              </div>
+            ) : null}
           </section>
 
           <section className="bottom-grid">
@@ -676,25 +812,28 @@ export default function Home() {
                   <p>Pick up where you left off.</p>
                 </div>
               </div>
-              {copilotRuns.length === 0 ? (
-                <p className="activity-empty">No runs yet</p>
+              {assets.length === 0 ? (
+                <p className="activity-empty">No saved assets.</p>
               ) : (
                 <div className="activity-list">
-                  {copilotRuns.map((run) => (
-                    <div
+                  {assets.slice(0, 6).map((asset) => (
+                    <button
                       className="activity-row"
-                      key={copilotRunsKey(run)}
+                      key={`${asset.type}:${asset.id}`}
+                      type="button"
+                      onClick={() => router.push(asset.href)}
                     >
                       <span className="activity-copy">
-                        <strong>{run.skill_id}</strong>
+                        <strong>{asset.title}</strong>
                         <span>
+                          {ASSET_LABEL[asset.type]} ·{" "}
                           {new Intl.DateTimeFormat("en-US", {
                             dateStyle: "medium",
                             timeStyle: "short",
-                          }).format(new Date(run.created_at))}
+                          }).format(new Date(asset.createdAt))}
                         </span>
                       </span>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}

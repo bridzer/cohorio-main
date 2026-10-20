@@ -16,6 +16,11 @@ import {
   assertSameOrigin,
   originErrorResponse,
 } from "@/lib/auth/request";
+import {
+  assertTaskQuota,
+  quotaErrorResponse,
+  recordTaskEvent,
+} from "@/lib/billing/quota";
 
 export const runtime = "nodejs";
 
@@ -69,7 +74,26 @@ export async function POST(request: NextRequest) {
     if (body.source.length > 20_000) {
       return errorResponse("Source content exceeds 20,000 characters.", 400);
     }
+    const goals = [
+      "Build authority",
+      "Drive engagement",
+      "Generate leads",
+      "Drive traffic",
+    ];
+    const voices = [
+      "Clear & insightful",
+      "Bold & contrarian",
+      "Warm & conversational",
+      "Concise & tactical",
+    ];
+    if (typeof body.goal !== "string" || !goals.includes(body.goal)) {
+      return errorResponse("Goal is not one of the supported choices.", 400);
+    }
+    if (typeof body.voice !== "string" || !voices.includes(body.voice)) {
+      return errorResponse("Voice is not one of the supported choices.", 400);
+    }
     const platforms = requestedPlatforms(body);
+    await assertTaskQuota(workspaceId);
     const [skillMarkdown, brandMarkdown] = await Promise.all([
       readSkillMarkdown("social"),
       workspaceContextMarkdown(workspaceId),
@@ -82,7 +106,10 @@ export async function POST(request: NextRequest) {
           role: "system",
           content: `${skillMarkdown}\n\n${brandMarkdown}\n\nWrite one ${platform} post. Return only the post text.`,
         },
-        { role: "user", content: body.source.trim() },
+        {
+          role: "user",
+          content: `${body.source.trim()}\n\nGoal: ${body.goal}\nVoice: ${body.voice}`,
+        },
       ]);
       drafts[platform] = clipSocialPost(output, platform);
     }
@@ -98,10 +125,13 @@ export async function POST(request: NextRequest) {
         }),
       );
     }
+    await recordTaskEvent(workspaceId, "social");
     return NextResponse.json({ posts: drafts, saved });
   } catch (error) {
     const originResponse = originErrorResponse(error);
     if (originResponse) return originResponse;
+    const quotaResponse = quotaErrorResponse(error);
+    if (quotaResponse) return quotaResponse;
     const accessResponse = accessErrorResponse(error);
     if (accessResponse) return accessResponse;
     if (error instanceof SyntaxError) {

@@ -74,16 +74,17 @@ export async function insertSocialPost(input: {
 export async function updateSocialPost(
   workspaceId: string,
   id: string,
-  input: { status: SocialPostStatus; scheduledFor: string | null },
+  input: { status: SocialPostStatus; scheduledFor: string | null; body?: string },
 ) {
   const result = await query<SocialPostRow>(
     `UPDATE social_posts
         SET status = $3,
-            scheduled_for = $4
+            scheduled_for = $4,
+            body = COALESCE($5, body)
       WHERE id = $1
         AND workspace_id = $2
       RETURNING id, platform, body, source_prompt, scheduled_for, status, created_at`,
-    [id, workspaceId, input.status, input.scheduledFor],
+    [id, workspaceId, input.status, input.scheduledFor, input.body ?? null],
   );
   return result.rows[0] ? publicPost(result.rows[0]) : null;
 }

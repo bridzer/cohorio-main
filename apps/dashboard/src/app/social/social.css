@@ -1201,6 +1201,25 @@
   gap: 14px;
 }
 
+.social-schedule-picker {
+  display: grid;
+  gap: 8px;
+  padding: 16px 20px;
+}
+
+.social-schedule-picker label { font-size: 13px; font-weight: 600; }
+.social-schedule-picker input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #d7ded7;
+  border-radius: 8px;
+  background: #fff;
+  color: #19241f;
+  font: inherit;
+}
+.social-schedule-picker p { margin: 0; font-size: 12px; color: #667068; }
+
 .social-saved-panel h2,
 .social-saved-panel h3 {
   margin: 0;
