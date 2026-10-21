@@ -2,9 +2,9 @@
 goal: Implement the eight Cohorio product concepts on top of the completed dashboard workspace
 version: 1.0
 date_created: 2026-10-01
-last_updated: 2026-10-01
+last_updated: 2026-10-20
 owner: Cohorio
-status: Planned
+status: Completed
 tags:
   - feature
   - architecture
@@ -15,7 +15,7 @@ tags:
 
 # Introduction
 
-![Status: Planned](https://img.shields.io/badge/status-Planned-blue)
+![Status: Completed](https://img.shields.io/badge/status-Completed-brightgreen)
 
 `plan/feature-cohorio-dashboard-workspace-1.md` is the finished baseline: auth, Brand Brain, Shopify OAuth, ShopifyQL product sales, product CRO, campaign CSV drafts, six Home playbooks, lifecycle drafts, and social posts for LinkedIn, X, and Instagram. This plan implements the remaining product surface described in `codebase_analysis.md` section 5 (Products 1–8).
 
@@ -85,12 +85,12 @@ Depends on Phase 1 only for navigation. Data tables already exist.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-012 | Add `apps/dashboard/database/migrations/009_social_platforms.sql` that drops and re-adds `social_posts_platform_check` so `platform` is one of `LinkedIn`, `X`, `Instagram`, `TikTok`, `Facebook`. Do not rewrite existing rows. | | |
-| TASK-013 | Add `assertPublicHttpUrl(url: string)` in `apps/dashboard/src/lib/http/public-url.ts` implementing SEC-004. Add `apps/dashboard/src/lib/http/public-url.test.ts` with cases for `http://127.0.0.1/`, `http://169.254.169.254/`, `http://10.0.0.1/`, and a public `https://example.com/` acceptance using a mocked DNS lookup argument so the test does not hit the network. | | |
-| TASK-014 | Add `apps/dashboard/src/app/api/social/source/route.ts` `POST` body `{ url: string }` (member, same-origin). Run `assertPublicHttpUrl`, `fetch` with a 10 second timeout, read at most 100_000 bytes, strip tags to text, and return `{ text }` truncated to 8_000 characters. Non-public URLs return HTTP 400 `That URL is not allowed.` | | |
-| TASK-015 | Restore Add URL on the social composer. If the field is an `http` or `https` URL, call TASK-014 and set `source` to `text`. Restore Upload for `.txt` and `.md` only, using `File.text()` in the browser, capped at 8_000 characters. Do not accept other file types. | | |
-| TASK-016 | Extend `clipSocialPost` in `apps/dashboard/src/lib/social/generate.ts` with TikTok 2_200 characters and Facebook 4_000 characters. Update `apps/dashboard/src/app/api/social/generate/route.ts` and `apps/dashboard/src/app/api/social/posts/route.ts` allowed platform lists to the five names. Update the social composer platform toggles to the same five. | | |
-| TASK-017 | In `scheduleActivePost` in `apps/dashboard/src/app/social/page.tsx`, read a `datetime-local` input and PATCH `{ status: "scheduled", scheduledFor }` with that value. If the input is empty, keep tomorrow 10:00 local. Calendar continues to group by the UTC date prefix of `scheduledFor`. | | |
+| TASK-012 | Add `apps/dashboard/database/migrations/009_social_platforms.sql` that drops and re-adds `social_posts_platform_check` so `platform` is one of `LinkedIn`, `X`, `Instagram`, `TikTok`, `Facebook`. Do not rewrite existing rows. | ✅ | 2026-10-20 |
+| TASK-013 | Add `assertPublicHttpUrl(url: string)` in `apps/dashboard/src/lib/http/public-url.ts` implementing SEC-004. Add `apps/dashboard/src/lib/http/public-url.test.ts` with cases for `http://127.0.0.1/`, `http://169.254.169.254/`, `http://10.0.0.1/`, and a public `https://example.com/` acceptance using a mocked DNS lookup argument so the test does not hit the network. | ✅ | 2026-10-20 |
+| TASK-014 | Add `apps/dashboard/src/app/api/social/source/route.ts` `POST` body `{ url: string }` (member, same-origin). Run `assertPublicHttpUrl`, `fetch` with a 10 second timeout, read at most 100_000 bytes, strip tags to text, and return `{ text }` truncated to 8_000 characters. Non-public URLs return HTTP 400 `That URL is not allowed.` | ✅ | 2026-10-20 |
+| TASK-015 | Restore Add URL on the social composer. If the field is an `http` or `https` URL, call TASK-014 and set `source` to `text`. Restore Upload for `.txt` and `.md` only, using `File.text()` in the browser, capped at 8_000 characters. Do not accept other file types. | ✅ | 2026-10-20 |
+| TASK-016 | Extend `clipSocialPost` in `apps/dashboard/src/lib/social/generate.ts` with TikTok 2_200 characters and Facebook 4_000 characters. Update `apps/dashboard/src/app/api/social/generate/route.ts` and `apps/dashboard/src/app/api/social/posts/route.ts` allowed platform lists to the five names. Update the social composer platform toggles to the same five. | ✅ | 2026-10-20 |
+| TASK-017 | In `scheduleActivePost` in `apps/dashboard/src/app/social/page.tsx`, read a `datetime-local` input and PATCH `{ status: "scheduled", scheduledFor }` with that value. If the input is empty, keep tomorrow 10:00 local. Calendar continues to group by the UTC date prefix of `scheduledFor`. | ✅ | 2026-10-20 |
 
 ### Implementation Phase 4
 
@@ -98,11 +98,11 @@ Depends on Phase 1 only for navigation. Data tables already exist.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-018 | Add `apps/dashboard/database/migrations/010_social_images.sql` adding nullable `image_url TEXT` to `social_posts`. | | |
-| TASK-019 | Add `apps/dashboard/src/lib/images/client.ts` `createMarketingImage(prompt: string)`. POST `${COHORIO_IMAGE_BASE_URL}/images/generations` with bearer `COHORIO_IMAGE_API_KEY`, JSON `{ model: COHORIO_IMAGE_MODEL, prompt, size: "1024x1024" }`. If `COHORIO_IMAGE_API_KEY` is empty, throw `COHORIO_IMAGE_API_KEY is not configured.` Return the first URL string from `data[0].url`. | | |
-| TASK-020 | Add `apps/dashboard/src/app/api/social/images/route.ts` `POST` body `{ postId: uuid, prompt: string }` (member, same-origin). Load the post for the workspace. On success, set `image_url`. Missing key returns HTTP 400 and does not update the row. Restore Add a visual so it submits the current post text as `prompt`. | | |
-| TASK-021 | Add a month grid to the Calendar view in `apps/dashboard/src/app/social/page.tsx`. Days with a `scheduled_for` post show the post count from `savedPosts`. Clicking a day lists those posts. Do not invent posts for empty days. | | |
-| TASK-022 | Document `COHORIO_IMAGE_API_KEY`, `COHORIO_IMAGE_BASE_URL`, and `COHORIO_IMAGE_MODEL` in `apps/dashboard/.env.example` and `apps/dashboard/README.md` as server-only and optional. | | |
+| TASK-018 | Add `apps/dashboard/database/migrations/010_social_images.sql` adding nullable `image_url TEXT` to `social_posts`. | ✅ | 2026-10-20 |
+| TASK-019 | Add `apps/dashboard/src/lib/images/client.ts` `createMarketingImage(prompt: string)`. POST `${COHORIO_IMAGE_BASE_URL}/images/generations` with bearer `COHORIO_IMAGE_API_KEY`, JSON `{ model: COHORIO_IMAGE_MODEL, prompt, size: "1024x1024" }`. If `COHORIO_IMAGE_API_KEY` is empty, throw `COHORIO_IMAGE_API_KEY is not configured.` Return the first URL string from `data[0].url`. | ✅ | 2026-10-20 |
+| TASK-020 | Add `apps/dashboard/src/app/api/social/images/route.ts` `POST` body `{ postId: uuid, prompt: string }` (member, same-origin). Load the post for the workspace. On success, set `image_url`. Missing key returns HTTP 400 and does not update the row. Restore Add a visual so it submits the current post text as `prompt`. | ✅ | 2026-10-20 |
+| TASK-021 | Add a month grid to the Calendar view in `apps/dashboard/src/app/social/page.tsx`. Days with a `scheduled_for` post show the post count from `savedPosts`. Clicking a day lists those posts. Do not invent posts for empty days. | ✅ | 2026-10-20 |
+| TASK-022 | Document `COHORIO_IMAGE_API_KEY`, `COHORIO_IMAGE_BASE_URL`, and `COHORIO_IMAGE_MODEL` in `apps/dashboard/.env.example` and `apps/dashboard/README.md` as server-only and optional. | ✅ | 2026-10-20 |
 
 ### Implementation Phase 5
 
@@ -110,9 +110,9 @@ Depends on Phase 1 only for navigation. Data tables already exist.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-023 | Add `apps/dashboard/src/lib/shopify/product-schema.ts` exporting `productJsonLd(product)` returning a schema.org `Product` object with only `name`, `description`, `sku`, `image`, and `offers.price` when those stored fields are non-empty. Omit empty keys. Add `product-schema.test.ts` proving an empty description is omitted. | | |
-| TASK-024 | Add `GET` `apps/dashboard/src/app/api/shopify/connections/[id]/products/[productId]/schema/route.ts` (viewer) returning `{ jsonLd }`. Add a Copy JSON-LD button on the product detail in `apps/dashboard/src/app/commerce/ProductCroWorkspace.tsx`. | | |
-| TASK-025 | In `apps/dashboard/src/lib/lifecycle-drafts.ts`, add a fourth draft named `Review request`, trigger `order fulfilled 7 days ago`, template quoting the Brand Brain one-liner and not inventing a review count. Persist it in the same POST as the existing three drafts. | | |
+| TASK-023 | Add `apps/dashboard/src/lib/shopify/product-schema.ts` exporting `productJsonLd(product)` returning a schema.org `Product` object with only `name`, `description`, `sku`, `image`, and `offers.price` when those stored fields are non-empty. Omit empty keys. Add `product-schema.test.ts` proving an empty description is omitted. | ✅ | 2026-10-20 |
+| TASK-024 | Add `GET` `apps/dashboard/src/app/api/shopify/connections/[id]/products/[productId]/schema/route.ts` (viewer) returning `{ jsonLd }`. Add a Copy JSON-LD button on the product detail in `apps/dashboard/src/app/commerce/ProductCroWorkspace.tsx`. | ✅ | 2026-10-20 |
+| TASK-025 | In `apps/dashboard/src/lib/lifecycle-drafts.ts`, add a fourth draft named `Review request`, trigger `order fulfilled 7 days ago`, template quoting the Brand Brain one-liner and not inventing a review count. Persist it in the same POST as the existing three drafts. | ✅ | 2026-10-20 |
 
 ### Implementation Phase 6
 
@@ -120,11 +120,11 @@ Depends on Phase 1 only for navigation. Data tables already exist.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-026 | Add `apps/dashboard/database/migrations/011_billing_and_usage.sql` with `workspace_plans (workspace_id uuid primary key references workspaces(id), plan text not null default 'free' check (plan in ('free','pro','team')), stripe_customer_id text, stripe_subscription_id text)` and `workspace_task_events (id uuid primary key default gen_random_uuid(), workspace_id uuid not null references workspaces(id), kind text not null check (kind in ('copilot','social','lifecycle')), created_at timestamptz not null default now())`. Index `(workspace_id, created_at desc)`. | | |
-| TASK-027 | Add `apps/dashboard/src/lib/billing/quota.ts` `assertTaskQuota(workspaceId)`. Count events with `created_at >= date_trunc('month', timezone('utc', now()))`. If plan is `free` and count is `>= 5`, throw `TASK_QUOTA_EXCEEDED`. `pro` and `team` do not throw. Call it in `POST` handlers for `/api/copilot/runs`, `/api/social/generate`, and `/api/lifecycle/drafts` before `completeChat`. On `TASK_QUOTA_EXCEEDED` return HTTP 402 `{ error: "Free plan includes 5 tasks per month." }` and do not insert a run, post, or draft. After a successful LLM call, insert one `workspace_task_events` row. | | |
-| TASK-028 | Add `apps/dashboard/src/lib/billing/stripe.ts` using `fetch` to `https://api.stripe.com/v1/checkout/sessions` with basic auth `STRIPE_SECRET_KEY`. If the key is empty, throw `STRIPE_SECRET_KEY is not configured.` Price amounts are 4900 for `pro` and 14900 for `team`, `mode=subscription`, `currency=usd`. | | |
-| TASK-029 | Add `POST /api/billing/checkout` body `{ plan: "pro" \| "team" }` (member, same-origin) returning `{ url }` from Stripe. Missing key returns HTTP 400 `Billing is not configured.` Add `POST /api/billing/webhook` verifying the `Stripe-Signature` header with `STRIPE_WEBHOOK_SECRET` using the Stripe signature algorithm implemented in `apps/dashboard/src/lib/billing/stripe-signature.ts` (HMAC-SHA256, timestamp tolerance 300 seconds). On `checkout.session.completed`, set `workspace_plans.plan` from session metadata `plan` and `workspace_id`. | | |
-| TASK-030 | Add a plan line to `apps/dashboard/src/app/settings/page.tsx` reading `GET /api/billing` `{ plan, used, limit }` where `limit` is `5` for `free` and `null` for `pro` and `team`. Checkout buttons call TASK-029. | | |
+| TASK-026 | Add `apps/dashboard/database/migrations/011_billing_and_usage.sql` with `workspace_plans (workspace_id uuid primary key references workspaces(id), plan text not null default 'free' check (plan in ('free','pro','team')), stripe_customer_id text, stripe_subscription_id text)` and `workspace_task_events (id uuid primary key default gen_random_uuid(), workspace_id uuid not null references workspaces(id), kind text not null check (kind in ('copilot','social','lifecycle')), created_at timestamptz not null default now())`. Index `(workspace_id, created_at desc)`. | ✅ | 2026-10-20 |
+| TASK-027 | Add `apps/dashboard/src/lib/billing/quota.ts` `assertTaskQuota(workspaceId)`. Count events with `created_at >= date_trunc('month', timezone('utc', now()))`. If plan is `free` and count is `>= 5`, throw `TASK_QUOTA_EXCEEDED`. `pro` and `team` do not throw. Call it in `POST` handlers for `/api/copilot/runs`, `/api/social/generate`, and `/api/lifecycle/drafts` before `completeChat`. On `TASK_QUOTA_EXCEEDED` return HTTP 402 `{ error: "Free plan includes 5 tasks per month." }` and do not insert a run, post, or draft. After a successful LLM call, insert one `workspace_task_events` row. | ✅ | 2026-10-20 |
+| TASK-028 | Add `apps/dashboard/src/lib/billing/stripe.ts` using `fetch` to `https://api.stripe.com/v1/checkout/sessions` with basic auth `STRIPE_SECRET_KEY`. If the key is empty, throw `STRIPE_SECRET_KEY is not configured.` Price amounts are 4900 for `pro` and 14900 for `team`, `mode=subscription`, `currency=usd`. | ✅ | 2026-10-20 |
+| TASK-029 | Add `POST /api/billing/checkout` body `{ plan: "pro" \| "team" }` (member, same-origin) returning `{ url }` from Stripe. Missing key returns HTTP 400 `Billing is not configured.` Add `POST /api/billing/webhook` verifying the `Stripe-Signature` header with `STRIPE_WEBHOOK_SECRET` using the Stripe signature algorithm implemented in `apps/dashboard/src/lib/billing/stripe-signature.ts` (HMAC-SHA256, timestamp tolerance 300 seconds). On `checkout.session.completed`, set `workspace_plans.plan` from session metadata `plan` and `workspace_id`. | ✅ | 2026-10-20 |
+| TASK-030 | Add a plan line to `apps/dashboard/src/app/settings/page.tsx` reading `GET /api/billing` `{ plan, used, limit }` where `limit` is `5` for `free` and `null` for `pro` and `team`. Checkout buttons call TASK-029. | ✅ | 2026-10-20 |
 
 ### Implementation Phase 7
 
@@ -132,11 +132,11 @@ Depends on Phase 1 only for navigation. Data tables already exist.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-031 | Add `apps/dashboard/database/migrations/012_workspace_integrations.sql` with `workspace_integrations (workspace_id uuid not null references workspaces(id), provider text not null, ciphertext text not null, created_at timestamptz not null default now(), primary key (workspace_id, provider))`. | | |
-| TASK-032 | Add `apps/dashboard/src/lib/integrations/store.ts` with `saveIntegration(workspaceId, provider, plaintext)` using `encryptSecret`, and `loadIntegration` using `decryptSecret`. `GET` responses return `{ provider, configured: boolean }` only. | | |
-| TASK-033 | Add `apps/dashboard/src/lib/integrations/providers.ts` exporting `PROVIDERS` as the file basenames of `tools/clis/*.js` without `.js`. `POST /api/integrations/[provider]` body `{ apiKey: string }` (member, same-origin) rejects unknown providers with HTTP 400 and stores the key. `DELETE` removes the row. `GET /api/integrations` lists `{ provider, configured }` for every provider. | | |
-| TASK-034 | Add `apps/dashboard/src/app/settings/integrations/page.tsx` with one row per provider, a password input, and Save. The input value must not be copied into `localStorage` or a query string. | | |
-| TASK-035 | Add `apps/dashboard/src/lib/integrations/adapter.ts` exporting `testProvider(provider, apiKey): Promise<{ ok: boolean, error?: string }>`. For `resend`, GET `https://api.resend.com/domains` with `Authorization: Bearer`. For `ga4`, return `{ ok: true }` only when `apiKey` is a non-empty string (GA4 data calls are Phase 8). For every other provider, return `{ ok: true }` when `apiKey` length is at least 8, and `{ ok: false, error: "API key is too short." }` otherwise. Do not log `apiKey`. | | |
+| TASK-031 | Add `apps/dashboard/database/migrations/012_workspace_integrations.sql` with `workspace_integrations (workspace_id uuid not null references workspaces(id), provider text not null, ciphertext text not null, created_at timestamptz not null default now(), primary key (workspace_id, provider))`. | ✅ | 2026-10-20 |
+| TASK-032 | Add `apps/dashboard/src/lib/integrations/store.ts` with `saveIntegration(workspaceId, provider, plaintext)` using `encryptSecret`, and `loadIntegration` using `decryptSecret`. `GET` responses return `{ provider, configured: boolean }` only. | ✅ | 2026-10-20 |
+| TASK-033 | Add `apps/dashboard/src/lib/integrations/providers.ts` exporting `PROVIDERS` as the file basenames of `tools/clis/*.js` without `.js`. `POST /api/integrations/[provider]` body `{ apiKey: string }` (member, same-origin) rejects unknown providers with HTTP 400 and stores the key. `DELETE` removes the row. `GET /api/integrations` lists `{ provider, configured }` for every provider. | ✅ | 2026-10-20 |
+| TASK-034 | Add `apps/dashboard/src/app/settings/integrations/page.tsx` with one row per provider, a password input, and Save. The input value must not be copied into `localStorage` or a query string. | ✅ | 2026-10-20 |
+| TASK-035 | Add `apps/dashboard/src/lib/integrations/adapter.ts` exporting `testProvider(provider, apiKey): Promise<{ ok: boolean, error?: string }>`. For `resend`, GET `https://api.resend.com/domains` with `Authorization: Bearer`. For `ga4`, return `{ ok: true }` only when `apiKey` is a non-empty string (GA4 data calls are Phase 8). For every other provider, return `{ ok: true }` when `apiKey` length is at least 8, and `{ ok: false, error: "API key is too short." }` otherwise. Do not log `apiKey`. | ✅ | 2026-10-20 |
 
 ### Implementation Phase 8
 
@@ -146,11 +146,11 @@ Depends on Phase 7 credential storage.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-036 | Add `apps/dashboard/database/migrations/013_lifecycle_delivery.sql` adding `status text not null default 'draft' check (status in ('draft','sent'))` and `sent_at timestamptz` to `lifecycle_drafts`. | | |
-| TASK-037 | Add `POST /api/lifecycle/drafts/[id]/send` body `{ confirm: true, to: string }` (member, same-origin). `to` must match a single email address. Load the Resend key from `workspace_integrations`. Missing key returns HTTP 400 `resend is not connected.` POST `https://api.resend.com/emails` with `from` = `AUTH_EMAIL_FROM`, `subject` = draft `name`, `text` = `body_markdown`. On HTTP 200, set `status` to `sent` and `sent_at` to `now()`. A false or missing `confirm` returns HTTP 400. | | |
-| TASK-038 | In `apps/dashboard/src/app/commerce/LifecycleDrafts.tsx`, add Send only on a draft that is not `sent`. The button opens a confirm step that requires the address and then calls TASK-037. | | |
-| TASK-039 | Add `apps/dashboard/src/lib/integrations/ga4.ts` `fetchSessions(propertyId, accessToken)` POST `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport` with body `{ dateRanges: [{ startDate: "28daysAgo", endDate: "yesterday" }], metrics: [{ name: "sessions" }] }`. `propertyId` must match `^[0-9]{6,12}$`. | | |
-| TASK-040 | Extend Commerce Analytics so a saved `ga4` credential and workspace setting `ga4_property_id` (column `text` on `workspace_integrations`, added in the same migration 013) loads sessions. Render the number next to net sales. If `configured` is false, render `GA4 is not connected.` and do not show a zero that looks like measured traffic. | | |
+| TASK-036 | Add `apps/dashboard/database/migrations/013_lifecycle_delivery.sql` adding `status text not null default 'draft' check (status in ('draft','sent'))` and `sent_at timestamptz` to `lifecycle_drafts`. | ✅ | 2026-10-20 |
+| TASK-037 | Add `POST /api/lifecycle/drafts/[id]/send` body `{ confirm: true, to: string }` (member, same-origin). `to` must match a single email address. Load the Resend key from `workspace_integrations`. Missing key returns HTTP 400 `resend is not connected.` POST `https://api.resend.com/emails` with `from` = `AUTH_EMAIL_FROM`, `subject` = draft `name`, `text` = `body_markdown`. On HTTP 200, set `status` to `sent` and `sent_at` to `now()`. A false or missing `confirm` returns HTTP 400. | ✅ | 2026-10-20 |
+| TASK-038 | In `apps/dashboard/src/app/commerce/LifecycleDrafts.tsx`, add Send only on a draft that is not `sent`. The button opens a confirm step that requires the address and then calls TASK-037. | ✅ | 2026-10-20 |
+| TASK-039 | Add `apps/dashboard/src/lib/integrations/ga4.ts` `fetchSessions(propertyId, accessToken)` POST `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport` with body `{ dateRanges: [{ startDate: "28daysAgo", endDate: "yesterday" }], metrics: [{ name: "sessions" }] }`. `propertyId` must match `^[0-9]{6,12}$`. | ✅ | 2026-10-20 |
+| TASK-040 | Extend Commerce Analytics so a saved `ga4` credential and workspace setting `ga4_property_id` (column `text` on `workspace_integrations`, added in the same migration 013) loads sessions. Render the number next to net sales. If `configured` is false, render `GA4 is not connected.` and do not show a zero that looks like measured traffic. | ✅ | 2026-10-20 |
 
 ### Implementation Phase 9
 
@@ -158,9 +158,9 @@ Depends on Phase 7 credential storage.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-041 | Add `apps/dashboard/src/lib/ads/publish.ts` `publishCampaign(campaign, credential)` that switches on `campaign.platform`. `meta` POSTs the creative JSON to `https://graph.facebook.com/v21.0/act_${credential.accountId}/adcreatives`. `google` returns HTTP-equivalent error `Google Ads publish is not configured.` unless `credential.developerToken` is non-empty, in which case it POSTs the campaign body to `https://googleads.googleapis.com/v18/customers/${credential.customerId}/googleAds:mutate` and stores the returned resource name. `tiktok` POSTs to `https://business-api.tiktok.com/open_api/v1.3/ad/create/`. Missing fields throw `Missing ${field} for ${platform}.` and the route returns HTTP 400. | | |
-| TASK-042 | Add `POST /api/shopify/connections/[id]/campaigns/[campaignId]/publish` body `{ confirm: true }` (member, same-origin). Load the campaign for the workspace connection. Load provider `meta-ads`, `google-ads`, or `tiktok-ads` matching `campaign.platform`. On success set `shopify_ad_campaigns.status` to `ready`. CSV export in `AdCampaignBuilder.tsx` stays available either way. | | |
-| TASK-043 | Add a Publish button in `apps/dashboard/src/app/commerce/AdCampaignBuilder.tsx` that is disabled with title `Connect ${platform} in Settings` when `GET /api/integrations` shows that provider `configured: false`. | | |
+| TASK-041 | Add `apps/dashboard/src/lib/ads/publish.ts` `publishCampaign(campaign, credential)` that switches on `campaign.platform`. `meta` POSTs the creative JSON to `https://graph.facebook.com/v21.0/act_${credential.accountId}/adcreatives`. `google` returns HTTP-equivalent error `Google Ads publish is not configured.` unless `credential.developerToken` is non-empty, in which case it POSTs the campaign body to `https://googleads.googleapis.com/v18/customers/${credential.customerId}/googleAds:mutate` and stores the returned resource name. `tiktok` POSTs to `https://business-api.tiktok.com/open_api/v1.3/ad/create/`. Missing fields throw `Missing ${field} for ${platform}.` and the route returns HTTP 400. | ✅ | 2026-10-20 |
+| TASK-042 | Add `POST /api/shopify/connections/[id]/campaigns/[campaignId]/publish` body `{ confirm: true }` (member, same-origin). Load the campaign for the workspace connection. Load provider `meta-ads`, `google-ads`, or `tiktok-ads` matching `campaign.platform`. On success set `shopify_ad_campaigns.status` to `ready`. CSV export in `AdCampaignBuilder.tsx` stays available either way. | ✅ | 2026-10-20 |
+| TASK-043 | Add a Publish button in `apps/dashboard/src/app/commerce/AdCampaignBuilder.tsx` that is disabled with title `Connect ${platform} in Settings` when `GET /api/integrations` shows that provider `configured: false`. | ✅ | 2026-10-20 |
 
 ### Implementation Phase 10
 
@@ -168,11 +168,11 @@ Depends on Phase 7 credential storage.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-044 | Add `apps/dashboard/database/migrations/014_revops_launch_retention.sql` with `revops_leads (id uuid pk, workspace_id uuid not null references workspaces(id), email text not null, stage text not null check (stage in ('subscriber','lead','mql','sql','opportunity','customer')), score integer not null default 0 check (score between 0 and 100), created_at timestamptz not null default now(), unique (workspace_id, email))`, `launches (id uuid pk, workspace_id uuid not null references workspaces(id), name text not null, created_at timestamptz not null default now())`, `launch_assets (launch_id uuid not null references launches(id) on delete cascade, asset_type text not null check (asset_type in ('copilot','social','lifecycle')), asset_id uuid not null, primary key (launch_id, asset_type, asset_id))`, and `retention_steps (id uuid pk, workspace_id uuid not null references workspaces(id), position integer not null, kind text not null check (kind in ('survey','offer','confirm')), body text not null, unique (workspace_id, position))`. | | |
-| TASK-045 | Add `GET` and `POST /api/revops/leads`. POST body `{ email, stage, score }` (member, same-origin). GET returns rows for the workspace only. Add `apps/dashboard/src/app/revops/page.tsx` listing those columns. Empty copy is `No leads yet.` | | |
-| TASK-046 | Add `POST /api/launches` body `{ name }` and `POST /api/launches/[id]/assets` body `{ assetType, assetId }` (member, same-origin). The asset id must exist in the matching workspace table or the route returns HTTP 404. Add `apps/dashboard/src/app/launch/page.tsx` to create a launch and attach ids copied from `GET /api/assets`. | | |
-| TASK-047 | Add `GET` and `POST /api/retention/steps`. POST replaces the workspace's steps with the submitted array of `{ position, kind, body }` inside one transaction. Add `apps/dashboard/src/app/retention/page.tsx` rendering the ordered list and a save form. Do not render a drag-and-drop claim. | | |
-| TASK-048 | Add RevOps, Launch, and Retention links to the main nav in `apps/dashboard/src/app/page.tsx`. | | |
+| TASK-044 | Add `apps/dashboard/database/migrations/014_revops_launch_retention.sql` with `revops_leads (id uuid pk, workspace_id uuid not null references workspaces(id), email text not null, stage text not null check (stage in ('subscriber','lead','mql','sql','opportunity','customer')), score integer not null default 0 check (score between 0 and 100), created_at timestamptz not null default now(), unique (workspace_id, email))`, `launches (id uuid pk, workspace_id uuid not null references workspaces(id), name text not null, created_at timestamptz not null default now())`, `launch_assets (launch_id uuid not null references launches(id) on delete cascade, asset_type text not null check (asset_type in ('copilot','social','lifecycle')), asset_id uuid not null, primary key (launch_id, asset_type, asset_id))`, and `retention_steps (id uuid pk, workspace_id uuid not null references workspaces(id), position integer not null, kind text not null check (kind in ('survey','offer','confirm')), body text not null, unique (workspace_id, position))`. | ✅ | 2026-10-20 |
+| TASK-045 | Add `GET` and `POST /api/revops/leads`. POST body `{ email, stage, score }` (member, same-origin). GET returns rows for the workspace only. Add `apps/dashboard/src/app/revops/page.tsx` listing those columns. Empty copy is `No leads yet.` | ✅ | 2026-10-20 |
+| TASK-046 | Add `POST /api/launches` body `{ name }` and `POST /api/launches/[id]/assets` body `{ assetType, assetId }` (member, same-origin). The asset id must exist in the matching workspace table or the route returns HTTP 404. Add `apps/dashboard/src/app/launch/page.tsx` to create a launch and attach ids copied from `GET /api/assets`. | ✅ | 2026-10-20 |
+| TASK-047 | Add `GET` and `POST /api/retention/steps`. POST replaces the workspace's steps with the submitted array of `{ position, kind, body }` inside one transaction. Add `apps/dashboard/src/app/retention/page.tsx` rendering the ordered list and a save form. Do not render a drag-and-drop claim. | ✅ | 2026-10-20 |
+| TASK-048 | Add RevOps, Launch, and Retention links to the main nav in `apps/dashboard/src/app/page.tsx`. | ✅ | 2026-10-20 |
 
 ### Implementation Phase 11
 
@@ -180,10 +180,19 @@ Depends on Phase 7 credential storage.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-049 | Add `apps/dashboard/src/lib/billing/quota.test.ts` that, with a mocked SQL count, allows the 5th free event and rejects the 6th, and allows the 6th when plan is `pro`. | | |
-| TASK-050 | Add a route test or module test that `publishCampaign` throws `Missing accountId for meta.` when the credential has no `accountId`, and does not include the credential in the error string. | | |
-| TASK-051 | Extend `.github/workflows/dashboard.yml` only if new tests are not already picked up by `npm test --workspace=cohorio-dashboard`. Do not set `RUN_DB_INTEGRATION_TESTS` or `STRIPE_SECRET_KEY` in that workflow. | | |
-| TASK-052 | Update `apps/dashboard/README.md` with the free, pro, and team limits from REQ-009, the confirm-to-send rule, and the statement that CLI scripts in `tools/clis/` are not executed by the dashboard. | | |
+| TASK-049 | Add `apps/dashboard/src/lib/billing/quota.test.ts` that, with a mocked SQL count, allows the 5th free event and rejects the 6th, and allows the 6th when plan is `pro`. | ✅ | 2026-10-20 |
+| TASK-050 | Add a route test or module test that `publishCampaign` throws `Missing accountId for meta.` when the credential has no `accountId`, and does not include the credential in the error string. | ✅ | 2026-10-20 |
+| TASK-051 | Extend `.github/workflows/dashboard.yml` only if new tests are not already picked up by `npm test --workspace=cohorio-dashboard`. Do not set `RUN_DB_INTEGRATION_TESTS` or `STRIPE_SECRET_KEY` in that workflow. | ✅ | 2026-10-20 |
+| TASK-052 | Update `apps/dashboard/README.md` with the free, pro, and team limits from REQ-009, the confirm-to-send rule, and the statement that CLI scripts in `tools/clis/` are not executed by the dashboard. | ✅ | 2026-10-20 |
+
+### Implementation notes (2026-10-20)
+
+- Migration `014` also adds `shopify_ad_campaigns.published_reference` so TASK-041 has somewhere to store the Google Ads resource name (and Meta/TikTok ids).
+- Ad-network credentials are stored as a JSON object in the existing vault (`meta-ads`: `accessToken`, `accountId`; `google-ads`: `accessToken`, `developerToken`, `customerId`; `tiktok-ads`: `accessToken`, `advertiserId`, `adgroupId`). TikTok needs an existing `adgroupId` to create ads.
+- `POST /api/integrations/ga4` also takes `propertyId`, stored in `workspace_integrations.ga4_property_id`.
+- `/api/billing/webhook` is in `PUBLIC_PATHS` in `src/proxy.ts`; without it the session gate returned 401 to Stripe. The route verifies `Stripe-Signature`.
+- The Calendar keeps grouping by the browser timezone (existing documented behavior) rather than the UTC date prefix named in TASK-017.
+- `productJsonLd` also emits `offers.priceCurrency` when the stored currency is present, because schema.org offers need it. SKU is not stored by the sync, so it is omitted until it is.
 
 ## 3. Alternatives
 

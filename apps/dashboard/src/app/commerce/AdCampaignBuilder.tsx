@@ -72,6 +72,12 @@ function platformName(platform: Platform) {
   }[platform];
 }
 
+const PUBLISH_PROVIDERS: Record<Platform, string> = {
+  meta: "meta-ads",
+  google: "google-ads",
+  tiktok: "tiktok-ads",
+};
+
 function money(value: number, currency: string) {
   return new Intl.NumberFormat(undefined, {
     style: "currency",
@@ -108,6 +114,33 @@ export default function AdCampaignBuilder({
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
   const [copiedId, setCopiedId] = useState("");
+  const [connectedProviders, setConnectedProviders] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [publishingId, setPublishingId] = useState("");
+  const [publishNotice, setPublishNotice] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/integrations", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((payload: { integrations?: { provider: string; configured: boolean }[] }) => {
+        if (cancelled) return;
+        setConnectedProviders(
+          new Set(
+            (payload.integrations ?? [])
+              .filter((item) => item.configured)
+              .map((item) => item.provider),
+          ),
+        );
+      })
+      .catch(() => {
+        // Publish stays disabled until connection status loads.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!connectionId) return;
@@ -262,6 +295,50 @@ export default function AdCampaignBuilder({
     );
   }
 
+  async function publish(campaign: Campaign) {
+    if (!connectionId) return;
+    if (
+      !window.confirm(
+        `Send "${campaign.name}" to ${platformName(campaign.platform)} now? Review the creatives first.`,
+      )
+    ) {
+      return;
+    }
+    setPublishingId(campaign.id);
+    setPublishNotice("");
+    setError("");
+    try {
+      const response = await fetch(
+        `/api/shopify/connections/${connectionId}/campaigns/${campaign.id}/publish`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true }),
+        },
+      );
+      const payload = (await response.json()) as {
+        campaign?: Campaign;
+        error?: string;
+      };
+      if (!response.ok || !payload.campaign) {
+        throw new Error(payload.error || "Unable to publish this campaign.");
+      }
+      setCampaigns((current) =>
+        current.map((item) => (item.id === campaign.id ? payload.campaign! : item)),
+      );
+      setPublishNotice(`Sent to ${platformName(campaign.platform)}.`);
+    } catch (publishError) {
+      setError(
+        publishError instanceof Error
+          ? publishError.message
+          : "Unable to publish this campaign.",
+      );
+    } finally {
+      setPublishingId("");
+    }
+  }
+
   async function copyCreative(creative: Creative) {
     await navigator.clipboard.writeText(
       `${creative.headline}\n\n${creative.primaryText}\n\n${creative.description}\n${creative.landingPageUrl ?? ""}`,
@@ -348,6 +425,11 @@ export default function AdCampaignBuilder({
       </div>
 
       {error && <div className="commerce-campaign-error">{error}</div>}
+      {publishNotice && (
+        <div className="commerce-campaign-notice" role="status">
+          {publishNotice}
+        </div>
+      )}
 
       <div className="commerce-campaign-grid">
         <form className="commerce-campaign-brief" onSubmit={buildCampaign}>
@@ -545,6 +627,20 @@ export default function AdCampaignBuilder({
                 <div>
                   <button onClick={() => exportCampaign(selectedCampaign)}>
                     Export CSV
+                  </button>
+                  <button
+                    disabled={
+                      publishingId === selectedCampaign.id ||
+                      !connectedProviders.has(PUBLISH_PROVIDERS[selectedCampaign.platform])
+                    }
+                    title={
+                      connectedProviders.has(PUBLISH_PROVIDERS[selectedCampaign.platform])
+                        ? undefined
+                        : `Connect ${platformName(selectedCampaign.platform)} in Settings`
+                    }
+                    onClick={() => void publish(selectedCampaign)}
+                  >
+                    {publishingId === selectedCampaign.id ? "Publishing..." : "Publish"}
                   </button>
                   <button
                     className="primary"

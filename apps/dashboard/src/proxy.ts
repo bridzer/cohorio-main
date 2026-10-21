@@ -12,6 +12,8 @@ const PUBLIC_PATHS = [
   "/auth/complete",
   "/api/auth",
   "/api/shopify/oauth/callback",
+  // Stripe calls this without a session; the route verifies Stripe-Signature.
+  "/api/billing/webhook",
 ];
 
 export async function proxy(request: NextRequest) {

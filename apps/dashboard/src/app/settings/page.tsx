@@ -40,6 +40,57 @@ export default function SettingsPage() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [billing, setBilling] = useState<{
+    plan: "free" | "pro" | "team";
+    used: number;
+    limit: number | null;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/billing", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const payload = (await response.json()) as {
+          plan: "free" | "pro" | "team";
+          used: number;
+          limit: number | null;
+        };
+        if (!cancelled) setBilling(payload);
+      })
+      .catch(() => {
+        // The plan card stays hidden until billing loads.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function checkout(plan: "pro" | "team") {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/billing/checkout", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+      });
+      const payload = (await response.json()) as { url?: string; error?: string };
+      if (!response.ok || !payload.url) {
+        throw new Error(payload.error || "Unable to start checkout.");
+      }
+      window.location.assign(payload.url);
+    } catch (checkoutError) {
+      setError(
+        checkoutError instanceof Error
+          ? checkoutError.message
+          : "Unable to start checkout.",
+      );
+      setBusy(false);
+    }
+  }
 
   async function load() {
     const response = await fetch("/api/account", { cache: "no-store" });
@@ -302,6 +353,39 @@ export default function SettingsPage() {
               <button disabled={busy}>Invite member</button>
             </form>
           )}
+        </section>
+
+        {billing && (
+          <section className="settings-card">
+            <div>
+              <h2>Plan</h2>
+              <p>
+                {billing.plan === "free"
+                  ? `Free plan · ${billing.used} of ${billing.limit} tasks used this month (UTC)`
+                  : `${billing.plan === "pro" ? "Pro" : "Team"} plan · ${billing.used} tasks this month · no task cap`}
+              </p>
+            </div>
+            {billing.plan === "free" ? (
+              <div className="settings-plan-actions">
+                <button disabled={busy} onClick={() => void checkout("pro")}>
+                  Upgrade to Pro · $49/month
+                </button>
+                <button disabled={busy} onClick={() => void checkout("team")}>
+                  Upgrade to Team · $149/month
+                </button>
+              </div>
+            ) : null}
+          </section>
+        )}
+
+        <section className="settings-card">
+          <div>
+            <h2>Marketing tools</h2>
+            <p>Connect Resend, GA4, ad networks, and other tools for this workspace.</p>
+          </div>
+          <Link href="/settings/integrations" className="settings-back">
+            Manage connections
+          </Link>
         </section>
 
         <section className="settings-card danger">

@@ -102,3 +102,81 @@ selected time together. The calendar groups entries in that same timezone and
 shows their times. You can change the time and reschedule the current post.
 Past dates and timestamps without a timezone are rejected by the API.
 Scheduling stores a calendar plan; automatic social publishing is not connected.
+If no time is chosen, Schedule uses tomorrow at 10:00 local time.
+
+Social Studio generates for LinkedIn, X, Instagram, TikTok, and Facebook.
+**Add URL** fetches a public `http`/`https` page on the server and uses its
+text as the source. Loopback, private, link-local, and cloud metadata
+addresses (including `169.254.169.254`) are rejected before the request and
+again after each redirect (at most 3). Fetches time out after 10 seconds and
+read at most 100,000 bytes. **Upload** accepts `.txt` and `.md` files only and
+reads them in the browser.
+
+## Social images
+
+**Add a visual** calls an OpenAI-compatible `/images/generations` endpoint and
+saves the returned URL on the post. Configure it with the server-only, optional
+variables `COHORIO_IMAGE_API_KEY`, `COHORIO_IMAGE_BASE_URL`, and
+`COHORIO_IMAGE_MODEL`. With no key, the button returns
+`COHORIO_IMAGE_API_KEY is not configured.` and the post is not changed. Post
+text generation does not depend on this key.
+
+## Plans and task limits
+
+Every successful copilot run, social generation, and lifecycle generation
+counts as one task.
+
+| Plan | Price (USD) | Tasks per UTC month |
+|------|-------------|---------------------|
+| `free` | $0 | 5 |
+| `pro` | $49/month | No cap |
+| `team` | $149/month | No cap |
+
+A free workspace that has used 5 tasks this month gets HTTP 402 and no model
+call is made. Checkout uses Stripe when `STRIPE_SECRET_KEY` is set; point a
+Stripe webhook for `checkout.session.completed` at
+`${APP_URL}/api/billing/webhook` and set `STRIPE_WEBHOOK_SECRET`. The webhook
+is the only billing route reachable without a session, and it rejects requests
+whose `Stripe-Signature` is missing, invalid, or older than 300 seconds. With
+no Stripe key every workspace stays on `free`.
+
+## Connected tools
+
+`/settings/integrations` stores one credential per workspace and provider,
+encrypted with `SHOPIFY_TOKEN_ENCRYPTION_KEY`. The provider list mirrors the
+file names in `tools/clis/`, but **the dashboard never executes those CLI
+scripts**. It calls provider HTTP APIs directly with the workspace credential.
+Responses report only whether a provider is configured.
+
+- **Resend**: paste an API key. Lifecycle drafts can then be sent one at a time.
+- **GA4**: paste an OAuth access token with Analytics read access plus the
+  numeric property id. Commerce Analytics then shows 28-day sessions next to
+  Shopify net sales; otherwise it shows `GA4 is not connected.`
+- **Ad networks**: paste a JSON object.
+  - `meta-ads`: `{"accessToken":"…","accountId":"…"}`
+  - `google-ads`: `{"accessToken":"…","developerToken":"…","customerId":"…"}`
+    (optional `loginCustomerId`)
+  - `tiktok-ads`: `{"accessToken":"…","advertiserId":"…","adgroupId":"…"}`
+
+## Confirm before anything is sent
+
+Generation endpoints never send. Lifecycle send
+(`POST /api/lifecycle/drafts/[id]/send`) and ad publish
+(`POST /api/shopify/connections/[id]/campaigns/[campaignId]/publish`) run only
+after a same-origin POST whose body contains `confirm: true`; otherwise they
+return HTTP 400 and change nothing. A missing provider credential returns HTTP
+400 naming the provider. A rejected ad publish returns HTTP 502 and the
+campaign is not marked `ready`. Google Ads campaigns are created `PAUSED`.
+CSV export stays available whether or not a network is connected. Social
+publishing is not connected.
+
+## RevOps, launches, and retention
+
+- `/revops` lists leads you add with an email, a stage
+  (`subscriber`, `lead`, `mql`, `sql`, `opportunity`, `customer`), and a 0–100
+  score. No stage is inferred for anyone not on the list.
+- `/launch` groups existing copilot, social, and lifecycle rows under a launch.
+  It stores references, not copies.
+- `/retention` stores an ordered list of cancel-flow steps (survey, offer,
+  confirm). Reorder with the arrow buttons and save; the whole list is replaced
+  in one transaction.

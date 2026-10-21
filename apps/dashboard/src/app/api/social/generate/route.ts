@@ -34,17 +34,17 @@ function requestedPlatforms(body: Record<string, unknown>) {
   if (Array.isArray(body.platforms)) {
     for (const item of body.platforms) {
       if (typeof item !== "string") {
-        throw new RangeError("Choose LinkedIn, X, or Instagram.");
+        throw new RangeError("Choose LinkedIn, X, Instagram, TikTok, or Facebook.");
       }
       values.push(item);
     }
   }
   const platforms = [...new Set(values)];
   if (!platforms.length) {
-    throw new RangeError("Choose LinkedIn, X, or Instagram.");
+    throw new RangeError("Choose LinkedIn, X, Instagram, TikTok, or Facebook.");
   }
   if (!platforms.every(isSocialPlatform)) {
-    throw new RangeError("Choose LinkedIn, X, or Instagram.");
+    throw new RangeError("Choose LinkedIn, X, Instagram, TikTok, or Facebook.");
   }
   return platforms as SocialPlatform[];
 }

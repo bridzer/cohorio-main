@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import {
+  ChangeEvent,
   FormEvent,
   ReactNode,
   useEffect,
@@ -13,7 +14,7 @@ import { accountInitials, useAccount } from "@/lib/use-account";
 import { localScheduleToIso, scheduleDay } from "@/lib/social/schedule";
 import "./social.css";
 
-type Platform = "LinkedIn" | "X" | "Instagram";
+type Platform = "LinkedIn" | "X" | "Instagram" | "TikTok" | "Facebook";
 type View = "Create" | "Calendar" | "Library" | "Analytics";
 
 const subscribeTimezone = () => () => {};
@@ -134,7 +135,7 @@ const icons = {
   plus: <path d="M12 5v14M5 12h14" />,
 };
 
-const platforms: Platform[] = ["LinkedIn", "X", "Instagram"];
+const platforms: Platform[] = ["LinkedIn", "X", "Instagram", "TikTok", "Facebook"];
 
 const platformConfig: Record<
   Platform,
@@ -143,13 +144,30 @@ const platformConfig: Record<
   LinkedIn: { mark: "in", className: "linkedin", limit: 3000 },
   X: { mark: "𝕏", className: "x", limit: 280 },
   Instagram: { mark: "◎", className: "instagram", limit: 2200 },
+  TikTok: { mark: "♪", className: "tiktok", limit: 2200 },
+  Facebook: { mark: "f", className: "facebook", limit: 4000 },
 };
 
 const emptyPosts: Record<Platform, string> = {
   LinkedIn: "",
   X: "",
   Instagram: "",
+  TikTok: "",
+  Facebook: "",
 };
+
+const MAX_SOURCE_CHARACTERS = 8_000;
+
+function tomorrowAtTen() {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T10:00`;
+}
+
+function monthKey(year: number, month: number) {
+  return `${year}-${String(month + 1).padStart(2, "0")}`;
+}
 
 type SavedPost = {
   id: string;
@@ -157,6 +175,7 @@ type SavedPost = {
   body: string;
   scheduledFor: string | null;
   status: "draft" | "scheduled" | "published";
+  imageUrl: string | null;
   createdAt: string;
 };
 
@@ -204,6 +223,15 @@ export default function SocialStudio() {
   const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
   const [postIds, setPostIds] = useState<Partial<Record<Platform, string>>>({});
   const [saving, setSaving] = useState(false);
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [urlOpen, setUrlOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [imaging, setImaging] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
+  const [selectedDay, setSelectedDay] = useState("");
 
   const draftCount = savedPosts.filter((post) => post.status === "draft").length;
   const scheduledCount = savedPosts.filter(
@@ -252,6 +280,84 @@ export default function SocialStudio() {
       }
       return [...current, platform];
     });
+  }
+
+  async function importUrl() {
+    const candidate = (sourceUrl || source).trim();
+    if (!/^https?:\/\//i.test(candidate)) {
+      setGenerateError("Enter an http or https URL.");
+      return;
+    }
+    setImporting(true);
+    setGenerateError("");
+    try {
+      const response = await fetch("/api/social/source", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: candidate }),
+      });
+      const payload = (await response.json()) as { text?: string; error?: string };
+      if (!response.ok || !payload.text) {
+        throw new Error(payload.error || "Unable to read that page.");
+      }
+      setSourceDraft(payload.text.slice(0, MAX_SOURCE_CHARACTERS));
+      setSourceUrl("");
+      setUrlOpen(false);
+    } catch (error) {
+      setGenerateError(
+        error instanceof Error ? error.message : "Unable to read that page.",
+      );
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function uploadSource(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!/\.(txt|md)$/i.test(file.name)) {
+      setGenerateError("Upload a .txt or .md file.");
+      return;
+    }
+    setGenerateError("");
+    try {
+      setSourceDraft((await file.text()).slice(0, MAX_SOURCE_CHARACTERS));
+    } catch {
+      setGenerateError("Unable to read that file.");
+    }
+  }
+
+  async function addVisual() {
+    const id = postIds[activePlatform];
+    if (!id || !activePost.trim() || imaging) return;
+    setImaging(true);
+    setGenerateError("");
+    try {
+      const response = await fetch("/api/social/images", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId: id, prompt: activePost }),
+      });
+      const payload = (await response.json()) as {
+        post?: SavedPost;
+        error?: string;
+      };
+      if (!response.ok || !payload.post) {
+        throw new Error(payload.error || "Unable to create an image.");
+      }
+      setSavedPosts((current) =>
+        current.map((post) => (post.id === payload.post!.id ? payload.post! : post)),
+      );
+    } catch (error) {
+      setGenerateError(
+        error instanceof Error ? error.message : "Unable to create an image.",
+      );
+    } finally {
+      setImaging(false);
+    }
   }
 
   async function generate(event: FormEvent) {
@@ -343,7 +449,7 @@ export default function SocialStudio() {
     setSaving(true);
     setGenerateError("");
     try {
-      const scheduledFor = localScheduleToIso(scheduleTime);
+      const scheduledFor = localScheduleToIso(scheduleTime || tomorrowAtTen());
       let id = postIds[activePlatform];
       if (!id) {
         if (!activePost.trim()) return;
@@ -413,6 +519,38 @@ export default function SocialStudio() {
       left.localeCompare(right),
     );
   }, [savedPosts, timeZone]);
+
+  const calendarByDay = useMemo(() => new Map(calendarGroups), [calendarGroups]);
+
+  const monthCells = useMemo(() => {
+    const { year, month } = calendarMonth;
+    const leading = new Date(year, month, 1).getDay();
+    const days = new Date(year, month + 1, 0).getDate();
+    const cells: (string | null)[] = Array.from({ length: leading }, () => null);
+    for (let day = 1; day <= days; day += 1) {
+      cells.push(`${monthKey(year, month)}-${String(day).padStart(2, "0")}`);
+    }
+    while (cells.length % 7) cells.push(null);
+    return cells;
+  }, [calendarMonth]);
+
+  const visibleCalendarGroups = calendarGroups.filter(([day]) =>
+    selectedDay
+      ? day === selectedDay
+      : day.startsWith(monthKey(calendarMonth.year, calendarMonth.month)),
+  );
+
+  function shiftMonth(delta: number) {
+    setSelectedDay("");
+    setCalendarMonth(({ year, month }) => {
+      const next = new Date(year, month + delta, 1);
+      return { year: next.getFullYear(), month: next.getMonth() };
+    });
+  }
+
+  const activeSavedPost = savedPosts.find(
+    (post) => post.id === postIds[activePlatform],
+  );
 
   const activeScheduledPost = savedPosts.find(
     (post) => post.id === postIds[activePlatform] && post.status === "scheduled",
@@ -520,8 +658,50 @@ export default function SocialStudio() {
             <section className="social-saved-panel">
               <h2>Calendar</h2>
               <p>Times shown in {timeZone}. Scheduling saves your plan; posts are not automatically published.</p>
-              {calendarGroups.length ? (
-                calendarGroups.map(([day, postsForDay]) => (
+              <div className="social-month">
+                <div className="social-month-heading">
+                  <button type="button" onClick={() => shiftMonth(-1)} aria-label="Previous month">
+                    ‹
+                  </button>
+                  <strong>
+                    {new Intl.DateTimeFormat("en-US", {
+                      month: "long",
+                      year: "numeric",
+                    }).format(new Date(calendarMonth.year, calendarMonth.month, 1))}
+                  </strong>
+                  <button type="button" onClick={() => shiftMonth(1)} aria-label="Next month">
+                    ›
+                  </button>
+                </div>
+                <div className="social-month-grid">
+                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label) => (
+                    <span key={label} className="social-month-weekday">
+                      {label}
+                    </span>
+                  ))}
+                  {monthCells.map((day, index) => {
+                    if (!day) return <span key={`blank-${index}`} />;
+                    const count = calendarByDay.get(day)?.length ?? 0;
+                    return (
+                      <button
+                        type="button"
+                        key={day}
+                        className={[
+                          count ? "has-posts" : "",
+                          selectedDay === day ? "active" : "",
+                        ].join(" ")}
+                        onClick={() => setSelectedDay(selectedDay === day ? "" : day)}
+                        aria-label={`${day}: ${count} scheduled`}
+                      >
+                        <span>{Number(day.slice(-2))}</span>
+                        {count ? <b>{count}</b> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {visibleCalendarGroups.length ? (
+                visibleCalendarGroups.map(([day, postsForDay]) => (
                   <div key={day} className="social-saved-group">
                     <h3>
                       {new Intl.DateTimeFormat("en-US", {
@@ -543,7 +723,11 @@ export default function SocialStudio() {
                   </div>
                 ))
               ) : (
-                <p>No scheduled posts yet.</p>
+                <p>
+                  {selectedDay
+                    ? "No posts scheduled for this day."
+                    : "No scheduled posts this month."}
+                </p>
               )}
             </section>
           ) : view === "Library" ? (
@@ -556,6 +740,10 @@ export default function SocialStudio() {
                     <article key={post.id}>
                       <strong>{post.platform}</strong>
                       <p>{post.body}</p>
+                      {post.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="social-post-image" src={post.imageUrl} alt="" />
+                      ) : null}
                     </article>
                   ))
               ) : (
@@ -612,9 +800,50 @@ export default function SocialStudio() {
                     placeholder="Paste a blog URL, transcript, newsletter, or rough idea..."
                   />
                   <div className="social-source-actions">
+                    <button
+                      type="button"
+                      onClick={() => setUrlOpen((open) => !open)}
+                      disabled={importing}
+                    >
+                      <Glyph size={15}>{icons.link}</Glyph>
+                      Add URL
+                    </button>
+                    <label className="social-upload">
+                      <Glyph size={15}>{icons.upload}</Glyph>
+                      Upload
+                      <input
+                        type="file"
+                        accept=".txt,.md,text/plain,text/markdown"
+                        onChange={(event) => void uploadSource(event)}
+                      />
+                    </label>
                     <span>{source.length} characters</span>
                   </div>
                 </div>
+                {urlOpen ? (
+                  <div className="social-url-row">
+                    <input
+                      type="url"
+                      aria-label="Source URL"
+                      placeholder="https://example.com/article"
+                      value={sourceUrl}
+                      onChange={(event) => setSourceUrl(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void importUrl();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={importing}
+                      onClick={() => void importUrl()}
+                    >
+                      {importing ? "Reading..." : "Import text"}
+                    </button>
+                  </div>
+                ) : null}
 
                 <div className="social-field">
                   <label>Publish to</label>
@@ -746,7 +975,21 @@ export default function SocialStudio() {
                     }))
                   }
                 />
+                {activeSavedPost?.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className="social-post-image" src={activeSavedPost.imageUrl} alt="" />
+                ) : null}
                 <div className="social-post-meta">
+                  <button
+                    type="button"
+                    className="social-visual"
+                    disabled={imaging || !postIds[activePlatform] || !activePost.trim()}
+                    title={postIds[activePlatform] ? undefined : "Save the draft first"}
+                    onClick={() => void addVisual()}
+                  >
+                    <Glyph size={14}>{icons.image}</Glyph>
+                    {imaging ? "Creating visual..." : "Add a visual"}
+                  </button>
                   <span>Voice: {tone}</span>
                   <span className={charCount > currentLimit ? "over" : ""}>
                     {charCount.toLocaleString()} / {currentLimit.toLocaleString()}
@@ -763,7 +1006,10 @@ export default function SocialStudio() {
                   onChange={(event) => setScheduleTime(event.target.value)}
                   disabled={saving}
                 />
-                <p>Saved to your calendar. Automatic publishing is not connected.</p>
+                <p>
+                  Saved to your calendar. Leave empty for tomorrow at 10:00.
+                  Automatic publishing is not connected.
+                </p>
                 {activeScheduledPost?.scheduledFor && (
                   <p role="status">Scheduled for {new Intl.DateTimeFormat("en-US", {
                     timeZone, dateStyle: "medium", timeStyle: "short",
@@ -782,7 +1028,7 @@ export default function SocialStudio() {
                 <button
                   className={`social-schedule ${activeScheduledPost ? "scheduled" : ""}`}
                   type="button"
-                  disabled={saving || !scheduleTime || !activePost.trim()}
+                  disabled={saving || !activePost.trim()}
                   onClick={() => void scheduleActivePost()}
                 >
                   <Glyph size={16}>

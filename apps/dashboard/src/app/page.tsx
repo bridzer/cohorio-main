@@ -173,7 +173,18 @@ const navItems: { label: string; icon: IconName }[] = [
   { label: "Performance", icon: "chart" },
   { label: "Connections", icon: "plug" },
   { label: "Commerce", icon: "bag" },
+  { label: "RevOps", icon: "target" },
+  { label: "Launch", icon: "send" },
+  { label: "Retention", icon: "check" },
 ];
+
+const navRoutes: Record<string, string> = {
+  Assets: "/library",
+  Commerce: "/commerce",
+  RevOps: "/revops",
+  Launch: "/launch",
+  Retention: "/retention",
+};
 
 type DashboardAccount = {
   user: { name?: string | null; email?: string | null };
@@ -501,12 +512,9 @@ export default function Home() {
               key={item.label}
               className={`nav-item ${activeNav === item.label ? "active" : ""}`}
               onClick={() => {
-                if (item.label === "Commerce") {
-                  router.push("/commerce");
-                  return;
-                }
-                if (item.label === "Assets") {
-                  router.push("/library");
+                const route = navRoutes[item.label];
+                if (route) {
+                  router.push(route);
                   return;
                 }
                 setActiveNav(item.label);

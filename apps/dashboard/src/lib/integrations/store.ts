@@ -56,3 +56,29 @@ export async function listIntegrationStatus(
     configured: configured.has(provider),
   }));
 }
+
+export async function saveGa4PropertyId(workspaceId: string, propertyId: string) {
+  const result = await query(
+    `UPDATE workspace_integrations
+        SET ga4_property_id = $3
+      WHERE workspace_id = $1 AND provider = $2`,
+    [workspaceId, "ga4", propertyId],
+  );
+  return Boolean(result.rowCount);
+}
+
+export async function loadGa4Settings(workspaceId: string) {
+  const result = await query<IntegrationRow & { ga4_property_id: string | null }>(
+    `SELECT provider, ciphertext, ga4_property_id
+       FROM workspace_integrations
+      WHERE workspace_id = $1 AND provider = 'ga4'`,
+    [workspaceId],
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    accessToken: decryptSecret(row.ciphertext),
+    propertyId: row.ga4_property_id,
+  };
+}
+

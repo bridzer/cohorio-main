@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { testProvider } from "@/lib/integrations/adapter";
 import { isKnownProvider } from "@/lib/integrations/providers";
+import { isGa4PropertyId } from "@/lib/integrations/ga4";
 import {
   deleteIntegration,
+  saveGa4PropertyId,
   saveIntegration,
 } from "@/lib/integrations/store";
 import {
@@ -30,15 +32,29 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (!(await isKnownProvider(provider))) {
       return errorResponse("That connection is not available.", 400);
     }
-    const body = (await request.json()) as { apiKey?: unknown };
+    const body = (await request.json()) as {
+      apiKey?: unknown;
+      propertyId?: unknown;
+    };
     if (typeof body.apiKey !== "string" || !body.apiKey.trim()) {
       return errorResponse("API key is too short.", 400);
+    }
+    let propertyId = "";
+    if (provider === "ga4") {
+      propertyId =
+        typeof body.propertyId === "string" ? body.propertyId.trim() : "";
+      if (!isGa4PropertyId(propertyId)) {
+        return errorResponse("GA4 property id must be 6 to 12 digits.", 400);
+      }
     }
     const checked = await testProvider(provider, body.apiKey.trim());
     if (!checked.ok) {
       return errorResponse(checked.error || "API key is too short.", 400);
     }
     await saveIntegration(access.workspaceId, provider, body.apiKey.trim());
+    if (propertyId) {
+      await saveGa4PropertyId(access.workspaceId, propertyId);
+    }
     return NextResponse.json({ provider, configured: true });
   } catch (error) {
     const originResponse = originErrorResponse(error);

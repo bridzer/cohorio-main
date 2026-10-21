@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
     const body = payload as Record<string, unknown>;
     if (typeof body.platform !== "string" || !isSocialPlatform(body.platform)) {
-      return errorResponse("Choose LinkedIn, X, or Instagram.", 400);
+      return errorResponse("Choose LinkedIn, X, Instagram, TikTok, or Facebook.", 400);
     }
     if (typeof body.body !== "string" || !body.body.trim()) {
       return errorResponse("Post text is required.", 400);

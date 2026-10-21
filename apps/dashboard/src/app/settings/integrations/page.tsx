@@ -6,6 +6,14 @@ import "../settings.css";
 
 type Integration = { provider: string; configured: boolean };
 
+const KEY_HINTS: Record<string, string> = {
+  ga4: "OAuth access token",
+  "meta-ads": '{"accessToken":"…","accountId":"…"}',
+  "google-ads":
+    '{"accessToken":"…","developerToken":"…","customerId":"…"}',
+  "tiktok-ads": '{"accessToken":"…","advertiserId":"…","adgroupId":"…"}',
+};
+
 const FEATURED = [
   "ga4",
   "mailchimp",
@@ -19,6 +27,7 @@ const FEATURED = [
 export default function IntegrationsPage() {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [ga4PropertyId, setGa4PropertyId] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState("");
@@ -37,15 +46,26 @@ export default function IntegrationsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    void load().catch((loadError: unknown) => {
-      if (!cancelled) {
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : "Unable to load connections.",
-        );
-      }
-    });
+    fetch("/api/integrations", { cache: "no-store" })
+      .then(async (response) => {
+        const payload = (await response.json()) as {
+          integrations?: Integration[];
+          error?: string;
+        };
+        if (!response.ok) {
+          throw new Error(payload.error || "Unable to load connections.");
+        }
+        if (!cancelled) setIntegrations(payload.integrations ?? []);
+      })
+      .catch((loadError: unknown) => {
+        if (!cancelled) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Unable to load connections.",
+          );
+        }
+      });
     return () => {
       cancelled = true;
     };
@@ -62,11 +82,16 @@ export default function IntegrationsPage() {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey }),
+        body: JSON.stringify(
+          provider === "ga4"
+            ? { apiKey, propertyId: ga4PropertyId.trim() }
+            : { apiKey },
+        ),
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Unable to save.");
       setDrafts((current) => ({ ...current, [provider]: "" }));
+      if (provider === "ga4") setGa4PropertyId("");
       setNotice(`${provider} is connected.`);
       await load();
     } catch (saveError) {
@@ -144,7 +169,7 @@ export default function IntegrationsPage() {
                   type="password"
                   autoComplete="off"
                   name={`${item.provider}-key`}
-                  placeholder="API key"
+                  placeholder={KEY_HINTS[item.provider] ?? "API key"}
                   value={drafts[item.provider] ?? ""}
                   onChange={(event) =>
                     setDrafts((current) => ({
@@ -153,6 +178,16 @@ export default function IntegrationsPage() {
                     }))
                   }
                 />
+                {item.provider === "ga4" ? (
+                  <input
+                    inputMode="numeric"
+                    autoComplete="off"
+                    name="ga4-property-id"
+                    placeholder="Property id"
+                    value={ga4PropertyId}
+                    onChange={(event) => setGa4PropertyId(event.target.value)}
+                  />
+                ) : null}
                 <button disabled={busy === item.provider} type="submit">
                   Save
                 </button>

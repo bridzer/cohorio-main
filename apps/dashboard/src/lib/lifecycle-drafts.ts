@@ -6,6 +6,7 @@ export const LIFECYCLE_DRAFT_NAMES = [
   "Abandoned checkout",
   "Post-purchase",
   "Win-back",
+  "Review request",
 ] as const;
 
 export type LifecycleDraftInput = {
@@ -18,7 +19,34 @@ const TRIGGERS: Record<(typeof LIFECYCLE_DRAFT_NAMES)[number], string> = {
   "Abandoned checkout": "Checkout started and not completed within 1 hour",
   "Post-purchase": "Order paid",
   "Win-back": "No order in the last 60 days",
+  "Review request": "order fulfilled 7 days ago",
 };
+
+function templateBody(
+  name: (typeof LIFECYCLE_DRAFT_NAMES)[number],
+  oneLiner: string,
+) {
+  if (name === "Review request") {
+    return [
+      "Subject: How is your order working out?",
+      "",
+      `Your order shipped a week ago. We built it around one promise: ${oneLiner}.`,
+      "",
+      "If it delivered on that, a short review helps the next customer decide. If it fell short, reply to this email and tell us why.",
+      "",
+      "[Leave a review]",
+      "",
+      "Do not quote review counts, star averages, or incentives that are not configured in the store.",
+    ].join("\n");
+  }
+  return [
+    `Subject: ${name}`,
+    "",
+    `This draft stays with the Brand Brain one-liner: ${oneLiner}.`,
+    "",
+    "Write the next version from that offer. Do not invent revenue, discounts, or customer counts.",
+  ].join("\n");
+}
 
 export function lifecycleTemplates(brandContextMarkdown: string) {
   const oneLiner =
@@ -30,13 +58,7 @@ export function lifecycleTemplates(brandContextMarkdown: string) {
   return LIFECYCLE_DRAFT_NAMES.map((name) => ({
     name,
     trigger: TRIGGERS[name],
-    bodyMarkdown: [
-      `Subject: ${name}`,
-      "",
-      `This draft stays with the Brand Brain one-liner: ${oneLiner}.`,
-      "",
-      "Write the next version from that offer. Do not invent revenue, discounts, or customer counts.",
-    ].join("\n"),
+    bodyMarkdown: templateBody(name, oneLiner),
   }));
 }
 
@@ -86,10 +108,11 @@ export async function buildLifecycleDrafts(brandContextMarkdown: string) {
     {
       role: "user",
       content: [
-        "Write three lifecycle email drafts.",
-        "Return only a JSON array with objects named exactly Abandoned checkout, Post-purchase, and Win-back.",
+        "Write four lifecycle email drafts.",
+        "Return only a JSON array with objects named exactly Abandoned checkout, Post-purchase, Win-back, and Review request.",
+        "Review request is sent 7 days after an order is fulfilled.",
         "Each object has name, trigger, and bodyMarkdown.",
-        "Do not invent revenue, discounts, or customer counts.",
+        "Do not invent revenue, discounts, review counts, star ratings, or customer counts.",
       ].join(" "),
     },
   ]);

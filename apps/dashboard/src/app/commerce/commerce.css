@@ -2358,3 +2358,89 @@
   white-space: pre-wrap;
   font-family: inherit;
 }
+
+.commerce-cro-recommendations > div:first-child {
+  gap: 8px;
+}
+
+.commerce-cro-recommendations h3 {
+  margin-right: auto;
+}
+
+.commerce-cro-schema {
+  border: 1px solid #d7ded7;
+  border-radius: 6px;
+  background: #fff;
+  padding: 3px 8px;
+  color: #527c65;
+  font-size: 7px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.commerce-cro-recommendations > div:first-child small {
+  color: #6e7771;
+  font-size: 7px;
+}
+
+.commerce-lifecycle-list header {
+  align-items: center;
+}
+
+.commerce-lifecycle-list header span {
+  margin-right: auto;
+}
+
+.commerce-lifecycle-list header em {
+  color: #527c65;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.commerce-lifecycle-list header button,
+.commerce-lifecycle-confirm button {
+  border: 1px solid #d7ded7;
+  border-radius: 8px;
+  background: #fff;
+  padding: 6px 12px;
+  color: #34473e;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.commerce-lifecycle-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.commerce-lifecycle-confirm label {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+  min-width: 220px;
+  color: #59655f;
+  font-size: 12px;
+}
+
+.commerce-lifecycle-confirm input {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid #d7ded7;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.commerce-analytics-totals {
+  grid-template-columns: repeat(3, minmax(0, 200px));
+}
+
+.commerce-analytics-totals small {
+  display: block;
+  margin-top: 8px;
+  color: #667068;
+  font-size: 12px;
+}

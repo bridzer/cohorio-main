@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { contextToMarkdown } from "../marketing-context";
 import {
+  clipSocialPost,
   generateSocialPosts,
   socialGenerationPrompt,
 } from "./generate";
@@ -42,5 +43,14 @@ describe("social generation prompts", () => {
     );
     expect(posts.X).toContain("Acme widgets cut warehouse picking time in half");
     expect(posts.Instagram).toBeUndefined();
+  });
+});
+
+describe("clipSocialPost", () => {
+  it("applies TikTok and Facebook limits", () => {
+    const long = "word ".repeat(2_000);
+    expect(clipSocialPost(long, "TikTok").length).toBeLessThanOrEqual(2_200);
+    expect(clipSocialPost(long, "Facebook").length).toBeLessThanOrEqual(4_000);
+    expect(clipSocialPost(long, "Facebook").length).toBeGreaterThan(2_200);
   });
 });

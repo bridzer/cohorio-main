@@ -106,6 +106,7 @@ export default function ProductCroWorkspace({
   const [saving, setSaving] = useState(false);
   const [implementationError, setImplementationError] = useState("");
   const [reauthorizationRequired, setReauthorizationRequired] = useState(false);
+  const [schemaStatus, setSchemaStatus] = useState("");
 
   useEffect(() => {
     if (!connectionId) return;
@@ -164,6 +165,34 @@ export default function ProductCroWorkspace({
     products.find((product) => product.id === selectedId) ??
     filteredProducts[0] ??
     null;
+
+  async function copyJsonLd(productId: string) {
+    if (!connectionId) return;
+    setSchemaStatus("");
+    try {
+      const response = await fetch(
+        `/api/shopify/connections/${connectionId}/products/${encodeURIComponent(productId)}/schema`,
+        { cache: "no-store" },
+      );
+      const payload = (await response.json()) as {
+        jsonLd?: unknown;
+        error?: string;
+      };
+      if (!response.ok || !payload.jsonLd) {
+        throw new Error(payload.error || "Unable to build product schema.");
+      }
+      await navigator.clipboard.writeText(
+        `<script type="application/ld+json">\n${JSON.stringify(payload.jsonLd, null, 2)}\n</script>`,
+      );
+      setSchemaStatus("JSON-LD copied.");
+    } catch (copyError) {
+      setSchemaStatus(
+        copyError instanceof Error
+          ? copyError.message
+          : "Unable to copy product schema.",
+      );
+    }
+  }
 
   async function rescan() {
     setRescanning(true);
@@ -461,6 +490,14 @@ export default function ProductCroWorkspace({
               <div className="commerce-cro-recommendations">
                 <div>
                   <h3>Prioritized recommendations</h3>
+                  <button
+                    type="button"
+                    className="commerce-cro-schema"
+                    onClick={() => void copyJsonLd(selectedProduct.id)}
+                  >
+                    Copy JSON-LD
+                  </button>
+                  {schemaStatus ? <small role="status">{schemaStatus}</small> : null}
                   {selectedProduct.onlineStoreUrl && (
                     <a
                       href={selectedProduct.onlineStoreUrl}

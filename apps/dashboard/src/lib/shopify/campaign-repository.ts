@@ -198,3 +198,44 @@ export async function updateAdCampaignStatus(
   );
   return result.rows[0] ? publicCampaign(result.rows[0]) : null;
 }
+
+export async function getAdCampaign(
+  connectionId: string,
+  workspaceId: string,
+  campaignId: string,
+) {
+  const result = await query<CampaignRow>(
+    `SELECT campaign.*
+       FROM shopify_ad_campaigns campaign
+       JOIN shopify_connections connection
+         ON connection.id = campaign.connection_id
+      WHERE campaign.id = $1
+        AND campaign.connection_id = $2
+        AND connection.workspace_id = $3
+        AND campaign.status <> 'archived'`,
+    [campaignId, connectionId, workspaceId],
+  );
+  return result.rows[0] ? publicCampaign(result.rows[0]) : null;
+}
+
+export async function markAdCampaignPublished(
+  connectionId: string,
+  workspaceId: string,
+  campaignId: string,
+  publishedReference: string,
+) {
+  const result = await query<CampaignRow>(
+    `UPDATE shopify_ad_campaigns campaign
+        SET status = 'ready',
+            published_reference = NULLIF($4, ''),
+            updated_at = NOW()
+      FROM shopify_connections connection
+      WHERE campaign.id = $1
+        AND campaign.connection_id = $2
+        AND connection.id = campaign.connection_id
+        AND connection.workspace_id = $3
+      RETURNING campaign.*`,
+    [campaignId, connectionId, workspaceId, publishedReference],
+  );
+  return result.rows[0] ? publicCampaign(result.rows[0]) : null;
+}

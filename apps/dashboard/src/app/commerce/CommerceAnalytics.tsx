@@ -37,6 +37,48 @@ export default function CommerceAnalytics({
   connectionId: string | null;
 }) {
   const [range, setRange] = useState<Range>("30d");
+  const [ga4, setGa4] = useState<
+    | { state: "loading" }
+    | { state: "disconnected" }
+    | { state: "ready"; sessions: number; range: string }
+    | { state: "error"; error: string }
+  >({ state: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/analytics/ga4", { cache: "no-store" })
+      .then(async (response) => {
+        const payload = (await response.json()) as {
+          configured?: boolean;
+          sessions?: number;
+          range?: string;
+          error?: string;
+        };
+        if (cancelled) return;
+        if (payload.configured === false) {
+          setGa4({ state: "disconnected" });
+        } else if (!response.ok || typeof payload.sessions !== "number") {
+          setGa4({
+            state: "error",
+            error: payload.error || "Unable to load GA4 sessions.",
+          });
+        } else {
+          setGa4({
+            state: "ready",
+            sessions: payload.sessions,
+            range: payload.range || "Last 28 days",
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setGa4({ state: "error", error: "Unable to load GA4 sessions." });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [snapshot, setSnapshot] = useState<{
     connectionId: string;
     series: SeriesPoint[];
@@ -143,6 +185,22 @@ export default function CommerceAnalytics({
             <article>
               <span>Orders</span>
               <strong>{orders.toLocaleString()}</strong>
+            </article>
+            <article>
+              <span>
+                GA4 sessions{ga4.state === "ready" ? ` · ${ga4.range}` : ""}
+              </span>
+              {ga4.state === "ready" ? (
+                <strong>{ga4.sessions.toLocaleString()}</strong>
+              ) : (
+                <small>
+                  {ga4.state === "loading"
+                    ? "Loading GA4."
+                    : ga4.state === "error"
+                      ? ga4.error
+                      : "GA4 is not connected."}
+                </small>
+              )}
             </article>
           </div>
           {visible.length ? (

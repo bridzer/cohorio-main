@@ -3,7 +3,13 @@ import {
   markdownSectionHasProvidedValues,
 } from "../marketing-context";
 
-export const SOCIAL_PLATFORMS = ["LinkedIn", "X", "Instagram"] as const;
+export const SOCIAL_PLATFORMS = [
+  "LinkedIn",
+  "X",
+  "Instagram",
+  "TikTok",
+  "Facebook",
+] as const;
 
 export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
 
@@ -11,6 +17,8 @@ const PLATFORM_LIMITS: Record<SocialPlatform, number> = {
   LinkedIn: 3000,
   X: 280,
   Instagram: 2200,
+  TikTok: 2200,
+  Facebook: 4000,
 };
 
 export function isSocialPlatform(value: string): value is SocialPlatform {

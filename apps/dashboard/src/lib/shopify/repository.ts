@@ -582,6 +582,29 @@ export async function listShopifyProducts(id: string, workspaceId: string) {
   return result.rows.map(publicProduct);
 }
 
+export async function getShopifyProduct(
+  id: string,
+  workspaceId: string,
+  productId: string,
+) {
+  const result = await query<ProductOverviewRow>(
+    `SELECT shopify_product_id, title, handle, description_text, vendor,
+            product_type, tags, status, total_inventory, media_count,
+            variants_count, online_store_url, seo_title, seo_description,
+            minimum_price, currency_code, image_url, revenue_30d,
+            units_sold_30d, cro_score, cro_recommendations
+       FROM shopify_products product
+       JOIN shopify_connections connection
+         ON connection.id = product.connection_id
+      WHERE product.connection_id = $1
+        AND connection.workspace_id = $2
+        AND product.shopify_product_id = $3
+      LIMIT 1`,
+    [id, workspaceId, productId],
+  );
+  return result.rows[0] ? publicProduct(result.rows[0]) : null;
+}
+
 export async function productBelongsToConnection(
   connectionId: string,
   workspaceId: string,

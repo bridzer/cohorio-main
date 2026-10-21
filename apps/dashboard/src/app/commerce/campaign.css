@@ -668,3 +668,17 @@
     flex-direction: column;
   }
 }
+
+.commerce-campaign-notice {
+  border: 1px solid #c9dccf;
+  border-radius: 8px;
+  background: #f1f8f3;
+  padding: 10px 12px;
+  color: #3f6b52;
+  font-size: 8px;
+}
+
+.commerce-campaign-review-heading button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
