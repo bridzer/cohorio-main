@@ -12,7 +12,8 @@
     "test": "npm run test --workspace=cohorio-dashboard",
     "db:migrate": "npm run db:migrate --workspace=cohorio-dashboard",
     "auth:cleanup": "npm run auth:cleanup --workspace=cohorio-dashboard",
-    "auth:test-flow": "npm run auth:test-flow --workspace=cohorio-dashboard"
+    "auth:test-flow": "npm run auth:test-flow --workspace=cohorio-dashboard",
+    "eval": "npm run eval --workspace=cohorio-dashboard"
   },
   "engines": {
     "node": ">=20.9.0"

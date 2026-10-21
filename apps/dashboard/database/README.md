@@ -22,6 +22,10 @@ users ──< organization_memberships >── organizations ──< workspaces
   repository operations must include the authenticated workspace ID.
 - Anonymous workspaces exist only to recover or claim legacy pre-auth data.
   New authenticated accounts receive an organization and default workspace.
+- Agent tables (`agent_threads`, `agent_runs`, `agent_messages`,
+  `agent_actions`, `workspace_memories`) carry `workspace_id` and are only
+  read or written with it. `agent_actions` moves out of `pending` through a
+  single conditional update, so an approved action executes at most once.
 - Campaign-product selection is relational. The JSON product ID list remains
   as a compatibility snapshot, not the integrity boundary.
 

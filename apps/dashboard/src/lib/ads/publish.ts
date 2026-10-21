@@ -1,3 +1,4 @@
+import { META_GRAPH_VERSION } from "@/lib/integrations/connectors/meta-ads";
 import type { AdPlatform, CampaignCreative } from "@/lib/shopify/ad-campaign";
 
 export const AD_PROVIDERS: Record<AdPlatform, string> = {
@@ -101,7 +102,7 @@ async function publishMeta(campaign: PublishableCampaign, credential: AdCredenti
   const ids: string[] = [];
   for (const [index, creative] of campaign.creatives.entries()) {
     const response = await fetch(
-      `https://graph.facebook.com/v21.0/act_${accountId}/adcreatives`,
+      `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${accountId}/adcreatives`,
       {
         method: "POST",
         headers: {

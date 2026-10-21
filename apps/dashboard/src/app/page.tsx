@@ -1,16 +1,14 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { routeCopilotRequest } from "@/lib/copilot-route";
 import {
-  BRAND_BRAIN,
   FEATURE_WORKSPACES,
   INTELLIGENCE,
-  findJob,
   type WorkspaceDefinition,
   type WorkspaceJob,
 } from "@/lib/workspaces";
 import { useRouter } from "next/navigation";
+import { PENDING_PROMPT_KEY } from "@/lib/agent-ui/handoff";
 
 type IconName =
   | "spark"
@@ -179,6 +177,7 @@ const navItems: { label: string; icon: IconName }[] = [
 ];
 
 const navRoutes: Record<string, string> = {
+  "Ask Cohorio": "/agent",
   Assets: "/library",
   Commerce: "/commerce",
   RevOps: "/revops",
@@ -468,18 +467,9 @@ export default function Home() {
     const cleanPrompt = prompt.trim();
     if (!cleanPrompt || running) return;
     setPrompt("");
-    const route = routeCopilotRequest(cleanPrompt);
-    if (route.workspaceId === "content" && route.jobId === "social") {
-      sessionStorage.setItem("cohorio-social-source", cleanPrompt);
-      router.push("/social");
-      return;
-    }
-    const match = findJob(route.workspaceId, route.jobId) ?? {
-      workspace: BRAND_BRAIN,
-      job: BRAND_BRAIN.jobs[0],
-    };
-    if (!match.job) return;
-    void runWorkspace(match.workspace, match.job, {}, cleanPrompt);
+    // The agent picks the prompt up once on load; it never travels in the URL.
+    sessionStorage.setItem(PENDING_PROMPT_KEY, cleanPrompt);
+    router.push("/agent");
   }
 
   return (
@@ -680,12 +670,13 @@ export default function Home() {
               <Icon name="spark" size={23} />
             </div>
             <div className="copilot-copy">
-              <span className="copilot-label">Cohorio Co-Pilot · Brand Brain</span>
+              <span className="copilot-label">Cohorio agent · Brand Brain</span>
               <h2>{assistantMessage}</h2>
               <p>
-                Ask for a homepage audit, a welcome email sequence, ad
-                headlines, or a question about your product. Co-Pilot uses your
-                saved brand context.
+                Ask for a product page audit, a campaign, a week of posts, or a
+                question about your product. Cohorio uses your saved brand
+                context and store data, saves drafts, and asks before anything
+                is sent or published.
               </p>
               <form onSubmit={submitPrompt}>
                 <input

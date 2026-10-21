@@ -62,16 +62,33 @@ All Shopify API requests must remain in server routes or server jobs.
 
 ## Language model
 
-Home playbooks, social generation, and lifecycle drafts call an
-OpenAI-compatible chat completions endpoint. Configure it with:
+The agent, Home playbooks, social generation, lifecycle drafts and evals all go
+through `src/lib/llm/client.ts`, which supports two providers:
 
-- `COHORIO_LLM_API_KEY` — server-only bearer token. Leave it empty to fail
-  closed. Copilot and social generation return HTTP 400 with
-  `COHORIO_LLM_API_KEY is not configured.` and do not insert a row.
-- `COHORIO_LLM_BASE_URL` — API origin plus version path, for example
-  `https://api.groq.com/openai/v1` or `https://api.openai.com/v1`.
-- `COHORIO_LLM_MODEL` — model id accepted by that endpoint.
+- **`anthropic`** — Claude through the official Anthropic SDK
+  (`src/lib/llm/anthropic.ts`). Default model `claude-opus-5-5`. Thinking is
+  always on and is steered with `COHORIO_LLM_EFFORT`; refusals are retried
+  server-side on Anthropic's recommended fallback model (`fallbacks: "default"`);
+  the stable prompt prefix is cached across agent steps.
+- **`openai-compatible`** — any chat-completions API (Groq, OpenRouter, OpenAI)
+  at `COHORIO_LLM_BASE_URL`.
 
+Configure with:
+
+- `COHORIO_LLM_PROVIDER` — `anthropic` or `openai-compatible`. When unset, an
+  Anthropic key (`sk-ant-…`) selects `anthropic`.
+- `COHORIO_LLM_API_KEY` — server-only key for the chosen provider. Leave it
+  empty to fail closed: generation returns HTTP 400 with
+  `COHORIO_LLM_API_KEY is not configured.` and inserts nothing.
+- `COHORIO_LLM_MODEL` — model id. For `anthropic` it must be a Claude id
+  (defaults to `claude-opus-5-5`); a non-Claude id is rejected with a clear
+  error rather than sent.
+- `COHORIO_LLM_EFFORT` — `anthropic` only: `low`, `medium` (default), `high`,
+  `xhigh` or `max`. Higher effort thinks more and costs more.
+- `COHORIO_LLM_BASE_URL` — `openai-compatible` only, e.g.
+  `https://api.groq.com/openai/v1`.
+
+A key and base URL from different providers fail with HTTP 401 on every call.
 Do not send `COHORIO_LLM_API_KEY` to the browser. Restart the dev server after
 changing these values; Next.js reads `.env.local` only at startup.
 
@@ -158,6 +175,29 @@ Responses report only whether a provider is configured.
     (optional `loginCustomerId`)
   - `tiktok-ads`: `{"accessToken":"…","advertiserId":"…","adgroupId":"…"}`
 
+### Providers the agent can use
+
+These providers have a connector in `src/lib/integrations/connectors/`. Saving
+a credential makes one read-only call to the provider first and is rejected if
+the provider refuses it. When connected, the Cohorio agent gets their read
+tools; nothing in a connector writes to the provider.
+
+| Provider | Credential | Agent tools |
+|---|---|---|
+| `meta-ads` | `{"accessToken":"…","accountId":"act_…"}` | Campaign/ad set/ad results (spend, CTR, CPC, purchases, ROAS, leads); campaign list |
+| `klaviyo` | Private key `pk_…` with campaigns, metrics and accounts read scopes | Campaign results attributed to Placed Order (Klaviyo allows ~2 report calls a minute) |
+| `plausible` | `{"apiKey":"…","siteId":"example.com"}` (Plausible Cloud only) | Visitors, visits, pageviews, bounce rate, duration; by day, page, source, channel, country, device |
+| `dataforseo` | `{"login":"…","password":"API password"}` | Keyword volume, CPC and trend; current top Google results. **Each call is billed** to that DataForSEO account |
+
+API versions are pinned in the connectors and must be kept current: Meta
+Marketing API `v25.0` (also used for publishing) and Klaviyo revision
+`2026-10-15`. Meta retires Marketing API versions about a year after release;
+Klaviyo retires revisions two years after release.
+
+Every other provider in the list can store a key, shown as **Saved · not
+verified**. Cohorio neither checks nor uses those keys until a connector is
+added.
+
 ## Confirm before anything is sent
 
 Generation endpoints never send. Lifecycle send
@@ -180,3 +220,23 @@ publishing is not connected.
 - `/retention` stores an ordered list of cancel-flow steps (survey, offer,
   confirm). Reorder with the arrow buttons and save; the whole list is replaced
   in one transaction.
+
+## Agent automations
+
+`/agent/automations` schedules agent runs daily or weekly at a local hour in an
+IANA timezone. Each automation keeps its own conversation, runs with its
+creator's current workspace role, counts as one task, and never approves its
+own actions: anything that sends or publishes waits in **Waiting for approval**.
+When `notify` is on, the creator gets an email through the platform Resend key
+(`RESEND_API_KEY` and `AUTH_EMAIL_FROM`).
+
+Runs need a background worker. Set `COHORIO_WORKER_ENABLED=true` on the
+deployed service; the worker starts from `src/instrumentation.ts` and polls the
+`agent_jobs` table. Jobs are claimed with `FOR UPDATE SKIP LOCKED`, so running
+the worker on several instances is safe. The automations page warns when no
+worker has reported a heartbeat in the last two minutes.
+
+The worker also marks interactive agent runs that have been "running" for more
+than 30 minutes as failed, which happens when a server restarts mid-run.
+Scheduled social posts are still not delivered to networks: no posting
+integration exists yet.

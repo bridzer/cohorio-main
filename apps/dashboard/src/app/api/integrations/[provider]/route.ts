@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auditAgentEvent } from "@/lib/agent/audit";
 import { testProvider } from "@/lib/integrations/adapter";
 import { isKnownProvider } from "@/lib/integrations/providers";
 import { isGa4PropertyId } from "@/lib/integrations/ga4";
@@ -55,7 +56,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (propertyId) {
       await saveGa4PropertyId(access.workspaceId, propertyId);
     }
-    return NextResponse.json({ provider, configured: true });
+    await auditAgentEvent({
+      workspaceId: access.workspaceId,
+      actorUserId: access.userId,
+      eventType: "integration.connected",
+      targetType: "integration",
+      targetId: provider,
+      // Never the credential itself.
+      metadata: { verified: checked.verified },
+    });
+    return NextResponse.json({ provider, configured: true, verified: checked.verified });
   } catch (error) {
     const originResponse = originErrorResponse(error);
     if (originResponse) return originResponse;
@@ -76,6 +86,13 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       return errorResponse("That connection is not available.", 400);
     }
     await deleteIntegration(access.workspaceId, provider);
+    await auditAgentEvent({
+      workspaceId: access.workspaceId,
+      actorUserId: access.userId,
+      eventType: "integration.removed",
+      targetType: "integration",
+      targetId: provider,
+    });
     return NextResponse.json({ provider, configured: false });
   } catch (error) {
     const originResponse = originErrorResponse(error);

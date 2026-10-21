@@ -1,16 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { AdNetworkError, PublishConfigError } from "@/lib/ads/publish";
 import {
-  AD_PROVIDERS,
-  AdNetworkError,
-  parseAdCredential,
-  PublishConfigError,
-  publishCampaign,
-} from "@/lib/ads/publish";
-import {
-  getAdCampaign,
-  markAdCampaignPublished,
-} from "@/lib/shopify/campaign-repository";
-import { loadIntegration } from "@/lib/integrations/store";
+  CampaignNotFoundError,
+  publishWorkspaceCampaign,
+} from "@/lib/ads/publish-campaign";
 import {
   accessErrorResponse,
   requireWorkspaceAccess,
@@ -44,23 +37,7 @@ export async function POST(
     if (body?.confirm !== true) {
       return errorResponse("Confirm the publish before Cohorio sends this campaign.", 400);
     }
-    const campaign = await getAdCampaign(id, workspaceId, campaignId);
-    if (!campaign) return errorResponse("Campaign not found.", 404);
-
-    const provider = AD_PROVIDERS[campaign.platform];
-    const plaintext = await loadIntegration(workspaceId, provider);
-    if (!plaintext) return errorResponse(`${provider} is not connected.`, 400);
-
-    const reference = await publishCampaign(
-      campaign,
-      parseAdCredential(plaintext),
-    );
-    const published = await markAdCampaignPublished(
-      id,
-      workspaceId,
-      campaignId,
-      reference,
-    );
+    const published = await publishWorkspaceCampaign(workspaceId, id, campaignId);
     return NextResponse.json({ campaign: published });
   } catch (error) {
     const originResponse = originErrorResponse(error);
@@ -69,6 +46,9 @@ export async function POST(
     if (accessResponse) return accessResponse;
     if (error instanceof SyntaxError) {
       return errorResponse("Request body must be valid JSON.", 400);
+    }
+    if (error instanceof CampaignNotFoundError) {
+      return errorResponse(error.message, 404);
     }
     if (error instanceof PublishConfigError) {
       return errorResponse(error.message, 400);

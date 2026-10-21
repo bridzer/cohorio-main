@@ -31,12 +31,15 @@ export async function listWorkspaceAssets(workspaceId: string) {
     `SELECT type, id, title, created_at, href
        FROM (
          SELECT 'copilot'::text AS type,
-                id::text AS id,
-                prompt AS title,
-                created_at,
-                '/' AS href
-           FROM copilot_runs
-          WHERE workspace_id = $1
+                run.id::text AS id,
+                run.prompt AS title,
+                run.created_at,
+                COALESCE('/agent?thread=' || agent.thread_id::text, '/') AS href
+           FROM copilot_runs run
+           LEFT JOIN agent_runs agent
+             ON agent.copilot_run_id = run.id
+            AND agent.workspace_id = run.workspace_id
+          WHERE run.workspace_id = $1
          UNION ALL
          SELECT 'social'::text,
                 id::text,

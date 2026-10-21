@@ -40,6 +40,14 @@ export async function loadIntegration(workspaceId: string, provider: string) {
   return decryptSecret(row.ciphertext);
 }
 
+export async function listConfiguredProviders(workspaceId: string) {
+  const result = await query<{ provider: string }>(
+    `SELECT provider FROM workspace_integrations WHERE workspace_id = $1`,
+    [workspaceId],
+  );
+  return result.rows.map((row) => row.provider);
+}
+
 export async function listIntegrationStatus(
   workspaceId: string,
   providers: string[],

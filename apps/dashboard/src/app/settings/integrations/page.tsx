@@ -4,7 +4,14 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import "../settings.css";
 
-type Integration = { provider: string; configured: boolean };
+type Integration = {
+  provider: string;
+  configured: boolean;
+  label?: string | null;
+  keyHint?: string | null;
+  agentTools?: string[];
+  verifies?: boolean;
+};
 
 const KEY_HINTS: Record<string, string> = {
   ga4: "OAuth access token",
@@ -15,12 +22,14 @@ const KEY_HINTS: Record<string, string> = {
 };
 
 const FEATURED = [
+  "meta-ads",
+  "klaviyo",
+  "plausible",
+  "dataforseo",
   "ga4",
   "mailchimp",
   "google-ads",
-  "meta-ads",
   "resend",
-  "klaviyo",
   "stripe",
 ];
 
@@ -88,11 +97,15 @@ export default function IntegrationsPage() {
             : { apiKey },
         ),
       });
-      const payload = (await response.json()) as { error?: string };
+      const payload = (await response.json()) as { error?: string; verified?: boolean };
       if (!response.ok) throw new Error(payload.error || "Unable to save.");
       setDrafts((current) => ({ ...current, [provider]: "" }));
       if (provider === "ga4") setGa4PropertyId("");
-      setNotice(`${provider} is connected.`);
+      setNotice(
+        payload.verified
+          ? `${provider} is connected and the key was verified.`
+          : `${provider} key saved. Cohorio does not check or use this provider yet.`,
+      );
       await load();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Unable to save.");
@@ -162,14 +175,21 @@ export default function IntegrationsPage() {
                 onSubmit={(event) => void save(event, item.provider)}
               >
                 <span>
-                  <strong>{item.provider}</strong>
-                  <small>{item.configured ? "Connected" : "Not connected"}</small>
+                  <strong>{item.label ?? item.provider}</strong>
+                  <small>
+                    {item.configured
+                      ? item.verifies
+                        ? "Connected · verified when saved"
+                        : "Saved · not verified"
+                      : "Not connected"}
+                    {item.agentTools?.length ? " · Cohorio agent can use this" : ""}
+                  </small>
                 </span>
                 <input
                   type="password"
                   autoComplete="off"
                   name={`${item.provider}-key`}
-                  placeholder={KEY_HINTS[item.provider] ?? "API key"}
+                  placeholder={item.keyHint ?? KEY_HINTS[item.provider] ?? "API key"}
                   value={drafts[item.provider] ?? ""}
                   onChange={(event) =>
                     setDrafts((current) => ({

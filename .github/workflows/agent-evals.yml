@@ -1,0 +1,50 @@
+name: Agent evals
+
+# Live evals call the configured language model and cost tokens, so they run
+# only on demand. Add COHORIO_LLM_API_KEY (and optionally the base URL/model)
+# as repository secrets/variables first.
+on:
+  workflow_dispatch:
+    inputs:
+      case:
+        description: "Run a single case id (empty runs all)"
+        required: false
+        default: ""
+      repeats:
+        description: "Times to run each case, to expose flaky behaviour"
+        required: false
+        default: "1"
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run agent evals
+        env:
+          COHORIO_LLM_API_KEY: ${{ secrets.COHORIO_LLM_API_KEY }}
+          COHORIO_LLM_BASE_URL: ${{ vars.COHORIO_LLM_BASE_URL }}
+          COHORIO_LLM_MODEL: ${{ vars.COHORIO_LLM_MODEL }}
+          EVAL_CASE: ${{ inputs.case }}
+          EVAL_REPEATS: ${{ inputs.repeats }}
+        run: npm run eval --workspace=cohorio-dashboard
+
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-eval-report
+          path: apps/dashboard/eval-report.json
+          if-no-files-found: warn
