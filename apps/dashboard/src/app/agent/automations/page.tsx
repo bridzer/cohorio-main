@@ -209,7 +209,7 @@ export default function AutomationsPage() {
         </p>
       ) : null}
       {!emailConfigured ? (
-        <p className="agent-note">Email notifications are off because RESEND_API_KEY or AUTH_EMAIL_FROM is not set.</p>
+        <p className="agent-note">Email notifications are off because no email transport is configured (set SMTP_HOST, SMTP_USER and SMTP_PASSWORD, or RESEND_API_KEY and AUTH_EMAIL_FROM).</p>
       ) : null}
       {message ? <p className="automations-message" role="status">{message}</p> : null}
       {error ? <p className="agent-error" role="alert">{error}</p> : null}

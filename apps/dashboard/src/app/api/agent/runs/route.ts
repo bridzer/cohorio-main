@@ -15,6 +15,10 @@ import {
   originErrorResponse,
 } from "@/lib/auth/request";
 import {
+  assertAgentBudget,
+  budgetErrorResponse,
+} from "@/lib/billing/budget";
+import {
   assertTaskQuota,
   quotaErrorResponse,
   recordTaskEvent,
@@ -109,6 +113,7 @@ export async function POST(request: NextRequest) {
     }
     stream = body.stream === true;
     await assertTaskQuota(access.workspaceId);
+    await assertAgentBudget(access.workspaceId);
     input = {
       ctx: {
         workspaceId: access.workspaceId,
@@ -125,6 +130,8 @@ export async function POST(request: NextRequest) {
     if (originResponse) return originResponse;
     const quotaResponse = quotaErrorResponse(error);
     if (quotaResponse) return quotaResponse;
+    const budgetResponse = budgetErrorResponse(error);
+    if (budgetResponse) return budgetResponse;
     const accessResponse = accessErrorResponse(error);
     if (accessResponse) return accessResponse;
     if (error instanceof SyntaxError) {

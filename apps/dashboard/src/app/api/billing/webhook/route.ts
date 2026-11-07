@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { applyCheckoutSession } from "@/lib/billing/stripe";
+import {
+  applyCheckoutSession,
+  applyPaymentFailed,
+  applySubscriptionEvent,
+} from "@/lib/billing/stripe";
 import { verifyStripeSignature } from "@/lib/billing/stripe-signature";
 
 export const runtime = "nodejs";
@@ -27,6 +31,19 @@ export async function POST(request: NextRequest) {
           customer?: string | { id?: string } | null;
           subscription?: string | { id?: string } | null;
         },
+      );
+    } else if (
+      (event.type === "customer.subscription.created" ||
+        event.type === "customer.subscription.updated" ||
+        event.type === "customer.subscription.deleted") &&
+      event.data?.object
+    ) {
+      await applySubscriptionEvent(
+        event.data.object as Parameters<typeof applySubscriptionEvent>[0],
+      );
+    } else if (event.type === "invoice.payment_failed" && event.data?.object) {
+      await applyPaymentFailed(
+        event.data.object as Parameters<typeof applyPaymentFailed>[0],
       );
     }
     return NextResponse.json({ received: true });

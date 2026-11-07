@@ -51,17 +51,24 @@ export type ToolModel = (input: {
 
 const MODEL_TIMEOUT_MS = 90_000;
 
-export type LlmProvider = "anthropic" | "openai-compatible";
+export type LlmProvider = "anthropic" | "meta-muse" | "openai-compatible";
 
 /**
- * COHORIO_LLM_PROVIDER picks the API. Unset, an Anthropic key (sk-ant-) means
- * Claude through the Anthropic SDK; anything else uses the OpenAI-compatible
+ * COHORIO_LLM_PROVIDER picks the API: "anthropic", "meta-muse" (aliases
+ * "meta", "muse", "meta-ai") or "openai-compatible". Unset, an Anthropic key
+ * (sk-ant-) means Claude through the Anthropic SDK, a base URL at api.meta.ai
+ * means Meta Muse, and anything else uses the OpenAI-compatible
  * chat-completions endpoint at COHORIO_LLM_BASE_URL (Groq, OpenRouter, ...).
  */
 export function llmProvider(): LlmProvider {
   const configured = process.env.COHORIO_LLM_PROVIDER?.trim().toLowerCase();
   if (configured === "anthropic" || configured === "openai-compatible") return configured;
-  return process.env.COHORIO_LLM_API_KEY?.trim().startsWith("sk-ant-") ? "anthropic" : "openai-compatible";
+  if (configured === "meta-muse" || configured === "meta" || configured === "muse" || configured === "meta-ai") {
+    return "meta-muse";
+  }
+  if (process.env.COHORIO_LLM_API_KEY?.trim().startsWith("sk-ant-")) return "anthropic";
+  if ((process.env.COHORIO_LLM_BASE_URL ?? "").includes("api.meta.ai")) return "meta-muse";
+  return "openai-compatible";
 }
 
 /** Chat-completions messages carry only the standard fields. */
@@ -99,6 +106,10 @@ export const completeWithTools: ToolModel = async (input) => {
   if (llmProvider() === "anthropic") {
     const { claudeWithTools } = await import("./anthropic");
     return claudeWithTools(input);
+  }
+  if (llmProvider() === "meta-muse") {
+    const { museWithTools } = await import("./meta-muse");
+    return museWithTools(input);
   }
   const { apiKey, baseUrl, model } = modelConfig();
   const timeout = AbortSignal.timeout(MODEL_TIMEOUT_MS);
@@ -162,6 +173,10 @@ export async function completeChat(messages: ChatMessage[]) {
   if (llmProvider() === "anthropic") {
     const { claudeChat } = await import("./anthropic");
     return claudeChat(messages);
+  }
+  if (llmProvider() === "meta-muse") {
+    const { museChat } = await import("./meta-muse");
+    return museChat(messages);
   }
   const { apiKey, baseUrl, model } = modelConfig();
   const response = await fetch(`${baseUrl}/chat/completions`, {

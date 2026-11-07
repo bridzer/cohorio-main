@@ -44,6 +44,8 @@ export default function SettingsPage() {
     plan: "free" | "pro" | "team";
     used: number;
     limit: number | null;
+    status?: string;
+    agent?: { spentUsd: number; budgetUsd: number };
   } | null>(null);
 
   useEffect(() => {
@@ -55,6 +57,8 @@ export default function SettingsPage() {
           plan: "free" | "pro" | "team";
           used: number;
           limit: number | null;
+          status?: string;
+          agent?: { spentUsd: number; budgetUsd: number };
         };
         if (!cancelled) setBilling(payload);
       })
@@ -65,6 +69,30 @@ export default function SettingsPage() {
       cancelled = true;
     };
   }, []);
+
+  async function openPortal() {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/billing/portal", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      const payload = (await response.json()) as { url?: string; error?: string };
+      if (!response.ok || !payload.url) {
+        throw new Error(payload.error || "Unable to open the billing portal.");
+      }
+      window.location.assign(payload.url);
+    } catch (portalError) {
+      setError(
+        portalError instanceof Error
+          ? portalError.message
+          : "Unable to open the billing portal.",
+      );
+      setBusy(false);
+    }
+  }
 
   async function checkout(plan: "pro" | "team") {
     setBusy(true);
@@ -364,6 +392,17 @@ export default function SettingsPage() {
                   ? `Free plan · ${billing.used} of ${billing.limit} tasks used this month (UTC)`
                   : `${billing.plan === "pro" ? "Pro" : "Team"} plan · ${billing.used} tasks this month · no task cap`}
               </p>
+              {billing.agent ? (
+                <p>
+                  Agent spend this month: ${billing.agent.spentUsd.toFixed(2)} of $
+                  {billing.agent.budgetUsd.toFixed(2)} included
+                </p>
+              ) : null}
+              {billing.status === "past_due" ? (
+                <p role="alert">
+                  Your last payment failed. Update your payment method to keep your plan.
+                </p>
+              ) : null}
             </div>
             {billing.plan === "free" ? (
               <div className="settings-plan-actions">
@@ -374,7 +413,13 @@ export default function SettingsPage() {
                   Upgrade to Team · $149/month
                 </button>
               </div>
-            ) : null}
+            ) : (
+              <div className="settings-plan-actions">
+                <button disabled={busy} onClick={() => void openPortal()}>
+                  Manage billing
+                </button>
+              </div>
+            )}
           </section>
         )}
 

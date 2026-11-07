@@ -1,4 +1,5 @@
 import { query } from "@/lib/database";
+import { activeModelId, modelCostUsd } from "@/lib/llm/pricing";
 import type { AgentRunResult } from "./loop";
 import type { PendingAction, ToolStep } from "./types";
 
@@ -23,6 +24,8 @@ export type AgentRunRecord = {
   steps: ToolStep[];
   skills: string[];
   usage: { promptTokens: number; completionTokens: number; modelCalls: number };
+  model: string | null;
+  costUsd: number | null;
   createdAt: string;
   finishedAt: string | null;
 };
@@ -149,6 +152,8 @@ type RunRow = {
   prompt_tokens: number;
   completion_tokens: number;
   model_calls: number;
+  model: string | null;
+  cost_usd: string | null;
   created_at: Date;
   finished_at: Date | null;
 };
@@ -163,6 +168,8 @@ const publicRun = (row: RunRow): AgentRunRecord => ({
     completionTokens: row.completion_tokens,
     modelCalls: row.model_calls,
   },
+  model: row.model,
+  costUsd: row.cost_usd === null ? null : Number(row.cost_usd),
   createdAt: iso(row.created_at),
   finishedAt: isoOrNull(row.finished_at),
 });
@@ -189,11 +196,18 @@ export async function finishRun(
   result: AgentRunResult,
   copilotRunId: string | null,
 ) {
+  const model = activeModelId();
+  const costUsd = modelCostUsd(
+    model,
+    result.usage.promptTokens,
+    result.usage.completionTokens,
+  );
   await query(
     `UPDATE agent_runs
         SET status = 'completed', stop_reason = $3, output = $4, copilot_run_id = $5,
             steps = $6::jsonb, skills = $7::jsonb, prompt_tokens = $8,
-            completion_tokens = $9, model_calls = $10, finished_at = NOW()
+            completion_tokens = $9, model_calls = $10, finished_at = NOW(),
+            model = $11, cost_usd = $12
       WHERE id = $1 AND workspace_id = $2`,
     [
       runId,
@@ -206,6 +220,8 @@ export async function finishRun(
       result.usage.promptTokens,
       result.usage.completionTokens,
       result.usage.modelCalls,
+      model,
+      costUsd,
     ],
   );
 }
@@ -221,7 +237,7 @@ export async function failRun(workspaceId: string, runId: string) {
 export async function listThreadRuns(workspaceId: string, threadId: string) {
   const result = await query<RunRow>(
     `SELECT id, status, stop_reason, steps, skills, prompt_tokens, completion_tokens,
-            model_calls, created_at, finished_at
+            model_calls, model, cost_usd::text AS cost_usd, created_at, finished_at
        FROM agent_runs
       WHERE thread_id = $1 AND workspace_id = $2
       ORDER BY created_at ASC

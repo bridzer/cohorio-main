@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import { roleAllows } from "@/lib/auth/roles";
+import { AgentBudgetError, assertAgentBudget } from "@/lib/billing/budget";
 import { assertTaskQuota, recordTaskEvent, TaskQuotaError } from "@/lib/billing/quota";
 import { runAgentTurn, ThreadNotFoundError } from "./index";
 import {
@@ -60,11 +61,19 @@ export async function runAutomationJob(job: AgentJob) {
   }
   try {
     await assertTaskQuota(job.workspaceId);
+    await assertAgentBudget(job.workspaceId);
   } catch (error) {
     if (error instanceof TaskQuotaError) {
       await recordAutomationResult(job.workspaceId, automation.id, {
         status: "skipped",
         error: "Skipped: the workspace has used this month's task allowance.",
+      });
+      return;
+    }
+    if (error instanceof AgentBudgetError) {
+      await recordAutomationResult(job.workspaceId, automation.id, {
+        status: "skipped",
+        error: "Skipped: the workspace has used this month's agent budget.",
       });
       return;
     }

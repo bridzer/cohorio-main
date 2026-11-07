@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "db:migrate": "node scripts/migrate.mjs",
+    "worker:smoke": "node scripts/worker-smoke.mjs",
     "auth:cleanup": "node scripts/cleanup-auth.mjs",
     "auth:test-flow": "node scripts/test-auth-flow.mjs",
     "eval": "vitest run --config vitest.eval.config.mts",

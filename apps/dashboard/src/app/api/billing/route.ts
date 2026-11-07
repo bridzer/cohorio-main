@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAgentSpend } from "@/lib/billing/budget";
 import { getWorkspaceUsage } from "@/lib/billing/quota";
 import {
   accessErrorResponse,
@@ -17,7 +18,15 @@ export async function GET() {
   }
   try {
     const workspaceId = (await requireWorkspaceAccess("viewer")).workspaceId;
-    return NextResponse.json(await getWorkspaceUsage(workspaceId));
+    const [usage, agent] = await Promise.all([
+      getWorkspaceUsage(workspaceId),
+      getAgentSpend(workspaceId),
+    ]);
+    return NextResponse.json({
+      ...usage,
+      status: agent.status,
+      agent: { spentUsd: agent.spentUsd, budgetUsd: agent.budgetUsd },
+    });
   } catch (error) {
     const accessResponse = accessErrorResponse(error);
     if (accessResponse) return accessResponse;
