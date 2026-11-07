@@ -1,20 +1,16 @@
-import { Resend } from "resend";
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (character) => `&#${character.charCodeAt(0)};`);
-}
+import { emailTransport, escapeHtml, sendPlatformEmail } from "@/lib/email/transport";
 
 function appUrl() {
   return (process.env.APP_URL ?? process.env.AUTH_URL ?? "http://localhost:3000").replace(/\/$/, "");
 }
 
 export function notificationsConfigured() {
-  return Boolean(process.env.RESEND_API_KEY?.trim() && process.env.AUTH_EMAIL_FROM?.trim());
+  return emailTransport() !== null;
 }
 
 /**
  * Tells an automation's owner that a scheduled run finished. Uses the platform
- * Resend key (the one for account email), not a workspace's integration key.
+ * email transport (SMTP or Resend), not a workspace's integration key.
  */
 export async function sendAutomationEmail(input: {
   to: string;
@@ -43,8 +39,7 @@ export async function sendAutomationEmail(input: {
           } that will not happen until you approve ${input.pendingApprovals === 1 ? "it" : "them"}.`
         : "The scheduled run finished. Drafts it created are saved in your workspace.";
   const name = escapeHtml(input.automationName);
-  const result = await new Resend(process.env.RESEND_API_KEY).emails.send({
-    from: process.env.AUTH_EMAIL_FROM as string,
+  return sendPlatformEmail({
     to: input.to,
     subject,
     text: `${input.automationName}\n\n${message}\n\n${link}`,
@@ -55,6 +50,4 @@ export async function sendAutomationEmail(input: {
       <p><a href="${escapeHtml(link)}" style="display:inline-block;background:#234d3e;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none">Open in Cohorio</a></p>
     </div>`,
   });
-  if (result.error) throw new Error("Notification email delivery failed.");
-  return { delivered: true };
 }

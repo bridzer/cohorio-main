@@ -11,7 +11,8 @@
     "db:migrate": "node scripts/migrate.mjs",
     "auth:cleanup": "node scripts/cleanup-auth.mjs",
     "auth:test-flow": "node scripts/test-auth-flow.mjs",
-    "eval": "vitest run --config vitest.eval.config.mts"
+    "eval": "vitest run --config vitest.eval.config.mts",
+    "auth:test-flows": "node scripts/test-auth-flows.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.0.0",
@@ -19,6 +20,7 @@
     "argon2": "^0.45.1",
     "next": "16.3.0",
     "next-auth": "^5.0.0-beta.32",
+    "nodemailer": "^10.3.1",
     "pg": "^8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -34,6 +36,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.21.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",

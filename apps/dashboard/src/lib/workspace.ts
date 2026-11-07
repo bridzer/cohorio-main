@@ -41,7 +41,7 @@ export function clearWorkspaceCookie(response: NextResponse) {
 export async function ensureAnonymousWorkspace(workspaceId: string) {
   await query(
     `INSERT INTO workspaces (id, name, slug, status)
-     VALUES ($1, 'Anonymous workspace', CONCAT('anonymous-', LEFT($1::text, 8)), 'anonymous')
+     VALUES ($1::uuid, 'Anonymous workspace', CONCAT('anonymous-', LEFT($1::uuid::text, 8)), 'anonymous')
      ON CONFLICT (id) DO NOTHING`,
     [workspaceId],
   );

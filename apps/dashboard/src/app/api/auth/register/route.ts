@@ -84,7 +84,16 @@ export async function POST(request: NextRequest) {
     });
     let delivered = false;
     if (user) {
-      ({ delivered } = await sendVerificationEmail(email, token));
+      try {
+        ({ delivered } = await sendVerificationEmail(email, token));
+      } catch (error) {
+        // Usually the sender: Resend only sends from a verified domain (see AUTH_EMAIL_FROM).
+        console.error("Registration verification email failed", error);
+        return NextResponse.json(
+          { error: "We could not send the verification email. Try again later." },
+          { status: 503 },
+        );
+      }
     }
     const response = NextResponse.json(
       {
@@ -103,6 +112,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error && error.message === "INVALID_ORIGIN") {
       return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
     }
+    console.error("Registration failed", error);
     return NextResponse.json(
       { error: "Registration is temporarily unavailable." },
       { status: 503 },
