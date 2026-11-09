@@ -322,3 +322,17 @@ The worker also marks interactive agent runs that have been "running" for more
 than 30 minutes as failed, which happens when a server restarts mid-run.
 Scheduled social posts are still not delivered to networks: no posting
 integration exists yet.
+
+## Agent conversations and memories
+
+Every `/agent` conversation appears in the sidebar, where workspace members can
+rename or delete it. Deleting a conversation removes its messages, runs and
+approval history with it; automations that used it keep running with their
+conversation link cleared.
+
+The agent also keeps durable preferences across conversations ("Never use
+emojis in LinkedIn posts") — it saves one when you state a lasting preference,
+up to 50 per workspace. `/agent/memories` lists them, and workspace members can
+add, edit or delete them there. Memories reach the agent as reference data,
+never as instructions; never store secrets or personal data in one.
+Conversations and memory changes are recorded on the Activity page.

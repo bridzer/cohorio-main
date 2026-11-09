@@ -17,7 +17,7 @@ export const remember = defineTool({
     });
     if (!memory) {
       throw new ToolInputError(
-        `This workspace already has ${MEMORY_LIMIT} memories. Ask the user to remove some in Settings.`,
+        `This workspace already has ${MEMORY_LIMIT} memories. Ask the user to remove some on the Memories page.`,
       );
     }
     return { saved: true, id: memory.id };

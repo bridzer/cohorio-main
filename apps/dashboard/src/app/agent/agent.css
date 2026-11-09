@@ -87,6 +87,62 @@
   white-space: normal;
 }
 
+.agent-thread-row {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-thread-actions {
+  display: flex;
+  gap: 4px;
+  padding: 0 4px;
+}
+
+.agent-thread-actions button,
+.agent-thread-rename button {
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  padding: 2px 6px;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.agent-thread-actions button:hover:not(:disabled),
+.agent-thread-rename button:hover:not(:disabled) {
+  background: #eef1ea;
+  color: #33413a;
+}
+
+.agent-thread-actions button:disabled,
+.agent-thread-rename button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.agent-thread-actions .agent-thread-danger {
+  color: #a33327;
+  font-weight: 650;
+}
+
+.agent-thread-rename {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.agent-thread-rename input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #cfd8d1;
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
 .agent-muted {
   margin: 0;
   color: var(--muted);
@@ -789,4 +845,29 @@
 .automation-copy a {
   color: #275345;
   font-weight: 600;
+}
+
+.automation-copy .memory-content {
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: break-word;
+}
+
+.memory-edit {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.memory-edit textarea {
+  border: 1px solid #cfd8d1;
+  border-radius: 10px;
+  background: #fff;
+  padding: 9px 11px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  resize: vertical;
+  line-height: 1.5;
 }

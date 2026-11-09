@@ -12,6 +12,10 @@ export type AgentAuditEvent =
   | "agent.automation_updated"
   | "agent.automation_deleted"
   | "agent.automation_run_requested"
+  | "agent.thread_renamed"
+  | "agent.thread_deleted"
+  | "agent.memory_added"
+  | "agent.memory_updated"
   | "agent.memory_deleted"
   | "integration.connected"
   | "integration.removed";

@@ -92,6 +92,26 @@ export async function listThreads(workspaceId: string, limit = 30) {
   return result.rows.map(publicThread);
 }
 
+export async function renameThread(workspaceId: string, threadId: string, title: string) {
+  const result = await query<ThreadRow>(
+    `UPDATE agent_threads
+        SET title = $3, updated_at = now()
+      WHERE id = $1 AND workspace_id = $2
+      RETURNING id, title, created_at, updated_at`,
+    [threadId, workspaceId, title],
+  );
+  return result.rows[0] ? publicThread(result.rows[0]) : null;
+}
+
+/** Messages, runs and actions cascade; automations keep theirs nulled. */
+export async function deleteThread(workspaceId: string, threadId: string) {
+  const result = await query(
+    `DELETE FROM agent_threads WHERE id = $1 AND workspace_id = $2`,
+    [threadId, workspaceId],
+  );
+  return Boolean(result.rowCount);
+}
+
 type MessageRow = {
   id: string;
   run_id: string | null;
@@ -404,4 +424,15 @@ export async function deleteMemory(workspaceId: string, memoryId: string) {
     [memoryId, workspaceId],
   );
   return Boolean(result.rowCount);
+}
+
+export async function updateMemory(workspaceId: string, memoryId: string, content: string) {
+  const result = await query<MemoryRow>(
+    `UPDATE workspace_memories
+        SET content = $3
+      WHERE id = $1 AND workspace_id = $2
+      RETURNING id, content, created_at`,
+    [memoryId, workspaceId, content],
+  );
+  return result.rows[0] ? publicMemory(result.rows[0]) : null;
 }

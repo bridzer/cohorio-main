@@ -255,6 +255,10 @@ export function AgentWorkspace() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [confirmingAction, setConfirmingAction] = useState<string | null>(null);
   const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [busyThreadId, setBusyThreadId] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   // The thread a stream is writing into; its detail reloads only when the run ends.
@@ -427,6 +431,63 @@ export function AgentWorkspace() {
     }
   }
 
+  async function renameThread(thread: AgentThread) {
+    const title = renameDraft.trim();
+    if (!title) return;
+    setBusyThreadId(thread.id);
+    setError("");
+    try {
+      const response = await fetch(`/api/agent/threads/${thread.id}`, {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        thread?: AgentThread;
+        error?: string;
+      };
+      if (!response.ok || !payload.thread) {
+        throw new Error(payload.error || "Unable to rename this conversation.");
+      }
+      const renamed = payload.thread;
+      setThreads((current) => current.map((item) => (item.id === renamed.id ? renamed : item)));
+      setDetail((current) =>
+        current && current.thread.id === renamed.id ? { ...current, thread: renamed } : current,
+      );
+      setRenamingId(null);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to rename this conversation.");
+    } finally {
+      setBusyThreadId(null);
+    }
+  }
+
+  async function removeThread(thread: AgentThread) {
+    setBusyThreadId(thread.id);
+    setError("");
+    try {
+      const response = await fetch(`/api/agent/threads/${thread.id}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || "Unable to delete this conversation.");
+      }
+      setThreads((current) => current.filter((item) => item.id !== thread.id));
+      setConfirmDeleteId(null);
+      if (threadId === thread.id) {
+        setDetail(null);
+        router.push("/agent");
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to delete this conversation.");
+    } finally {
+      setBusyThreadId(null);
+    }
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void send(input);
@@ -477,6 +538,9 @@ export function AgentWorkspace() {
         <Link href="/agent/activity" className="agent-automations-link">
           Activity →
         </Link>
+        <Link href="/agent/memories" className="agent-automations-link">
+          Memories →
+        </Link>
 
         {pending.length ? (
           <section className="agent-sidebar-section">
@@ -498,14 +562,84 @@ export function AgentWorkspace() {
           {threads.length ? (
             <ul>
               {threads.map((thread) => (
-                <li key={thread.id}>
-                  <Link
-                    href={`/agent?thread=${thread.id}`}
-                    className={`agent-thread-link ${thread.id === threadId ? "active" : ""}`}
-                    aria-current={thread.id === threadId ? "page" : undefined}
-                  >
-                    {thread.title}
-                  </Link>
+                <li key={thread.id} className="agent-thread-row">
+                  {renamingId === thread.id ? (
+                    <form
+                      className="agent-thread-rename"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void renameThread(thread);
+                      }}
+                    >
+                      <input
+                        aria-label="Conversation title"
+                        value={renameDraft}
+                        maxLength={80}
+                        autoFocus
+                        onChange={(event) => setRenameDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Escape") setRenamingId(null);
+                        }}
+                      />
+                      <button
+                        type="submit"
+                        disabled={busyThreadId === thread.id || !renameDraft.trim()}
+                      >
+                        Save
+                      </button>
+                      <button type="button" onClick={() => setRenamingId(null)}>
+                        Cancel
+                      </button>
+                    </form>
+                  ) : (
+                    <>
+                      <Link
+                        href={`/agent?thread=${thread.id}`}
+                        className={`agent-thread-link ${thread.id === threadId ? "active" : ""}`}
+                        aria-current={thread.id === threadId ? "page" : undefined}
+                      >
+                        {thread.title}
+                      </Link>
+                      <span className="agent-thread-actions">
+                        {confirmDeleteId === thread.id ? (
+                          <>
+                            <button
+                              type="button"
+                              className="agent-thread-danger"
+                              disabled={busyThreadId === thread.id}
+                              onClick={() => void removeThread(thread)}
+                            >
+                              Confirm delete
+                            </button>
+                            <button type="button" onClick={() => setConfirmDeleteId(null)}>
+                              Keep
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              disabled={running || busyThreadId === thread.id}
+                              onClick={() => {
+                                setRenameDraft(thread.title);
+                                setRenamingId(thread.id);
+                                setConfirmDeleteId(null);
+                              }}
+                            >
+                              Rename
+                            </button>
+                            <button
+                              type="button"
+                              disabled={running || busyThreadId === thread.id}
+                              onClick={() => setConfirmDeleteId(thread.id)}
+                            >
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </span>
+                    </>
+                  )}
                 </li>
               ))}
             </ul>
