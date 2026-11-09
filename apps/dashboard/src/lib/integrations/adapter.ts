@@ -1,5 +1,11 @@
 import { ProviderError } from "./http";
 import { connectorFor } from "./connectors";
+import {
+  fetchSessions,
+  isGa4PropertyId,
+  parseGa4Credential,
+  resolveGa4AccessToken,
+} from "./ga4";
 
 export type ProviderCheck = {
   ok: boolean;
@@ -32,6 +38,26 @@ export async function testProvider(provider: string, apiKey: string): Promise<Pr
   }
   if (provider === "ga4") {
     if (!apiKey.trim()) return { ok: false, verified: false, error: "API key is too short." };
+    const credential = parseGa4Credential(apiKey);
+    // A JSON credential with a property id can be checked with a real report;
+    // a bare access token cannot (no property), so it stays unverified.
+    if (credential.propertyId && isGa4PropertyId(credential.propertyId)) {
+      try {
+        const accessToken = await resolveGa4AccessToken(credential, AbortSignal.timeout(20_000));
+        if (!accessToken) throw new Error("empty token");
+        await fetchSessions(credential.propertyId, accessToken);
+        return { ok: true, verified: true };
+      } catch (error) {
+        return {
+          ok: false,
+          verified: false,
+          error:
+            error instanceof ProviderError
+              ? error.message
+              : "GA4 rejected that credential. Check the property id and token.",
+        };
+      }
+    }
     return { ok: true, verified: false };
   }
   if (apiKey.length < 8) {

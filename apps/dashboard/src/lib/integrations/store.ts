@@ -1,5 +1,6 @@
 import { decryptSecret, encryptSecret } from "@/lib/secret-box";
 import { query } from "@/lib/database";
+import { parseGa4Credential } from "./ga4";
 
 type IntegrationRow = {
   provider: string;
@@ -84,9 +85,11 @@ export async function loadGa4Settings(workspaceId: string) {
   );
   const row = result.rows[0];
   if (!row) return null;
+  const credential = parseGa4Credential(decryptSecret(row.ciphertext));
   return {
-    accessToken: decryptSecret(row.ciphertext),
-    propertyId: row.ga4_property_id,
+    accessToken: credential.accessToken,
+    refreshToken: credential.refreshToken,
+    propertyId: credential.propertyId ?? row.ga4_property_id,
   };
 }
 

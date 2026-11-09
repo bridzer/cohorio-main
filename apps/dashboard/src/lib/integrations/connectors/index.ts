@@ -1,12 +1,14 @@
 import type { AgentTool } from "@/lib/agent/types";
 import { connector as dataforseo } from "./dataforseo";
+import { connector as googleAds } from "./google-ads";
 import { connector as klaviyo } from "./klaviyo";
+import { connector as mailchimp } from "./mailchimp";
 import { connector as metaAds } from "./meta-ads";
 import { connector as plausible } from "./plausible";
 import type { Connector } from "./types";
 
 export const CONNECTORS: Record<string, Connector<unknown>> = Object.fromEntries(
-  [metaAds, klaviyo, plausible, dataforseo].map((connector) => [
+  [metaAds, googleAds, klaviyo, mailchimp, plausible, dataforseo].map((connector) => [
     connector.provider,
     connector as Connector<unknown>,
   ]),

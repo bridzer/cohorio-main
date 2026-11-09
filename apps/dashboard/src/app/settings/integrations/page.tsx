@@ -14,11 +14,9 @@ type Integration = {
 };
 
 const KEY_HINTS: Record<string, string> = {
-  ga4: "OAuth access token",
-  "meta-ads": '{"accessToken":"…","accountId":"…"}',
+  ga4: '{"refreshToken":"…","propertyId":"…"} or an OAuth access token',
   "google-ads":
-    '{"accessToken":"…","developerToken":"…","customerId":"…"}',
-  "tiktok-ads": '{"accessToken":"…","advertiserId":"…","adgroupId":"…"}',
+    '{"refreshToken":"…","developerToken":"…","customerId":"…"}',
 };
 
 const FEATURED = [
@@ -104,12 +102,38 @@ export default function IntegrationsPage() {
       setNotice(
         payload.verified
           ? `${provider} is connected and the key was verified.`
-          : `${provider} key saved. Cohorio does not check or use this provider yet.`,
+          : provider === "ga4"
+            ? "GA4 saved. A pasted access token expires in about an hour — Connect with Google for a lasting connection."
+            : `${provider} key saved. Cohorio does not check or use this provider yet.`,
       );
       await load();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Unable to save.");
     } finally {
+      setBusy("");
+    }
+  }
+
+  async function connectGa4() {
+    setBusy("ga4");
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/integrations/ga4/oauth/start", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      const payload = (await response.json()) as { url?: string; error?: string };
+      if (!response.ok || !payload.url) {
+        throw new Error(payload.error || "Unable to start the GA4 connection.");
+      }
+      window.location.assign(payload.url);
+    } catch (connectError) {
+      setError(
+        connectError instanceof Error
+          ? connectError.message
+          : "Unable to start the GA4 connection.",
+      );
       setBusy("");
     }
   }
@@ -199,14 +223,23 @@ export default function IntegrationsPage() {
                   }
                 />
                 {item.provider === "ga4" ? (
-                  <input
-                    inputMode="numeric"
-                    autoComplete="off"
-                    name="ga4-property-id"
-                    placeholder="Property id"
-                    value={ga4PropertyId}
-                    onChange={(event) => setGa4PropertyId(event.target.value)}
-                  />
+                  <>
+                    <input
+                      inputMode="numeric"
+                      autoComplete="off"
+                      name="ga4-property-id"
+                      placeholder="Property id"
+                      value={ga4PropertyId}
+                      onChange={(event) => setGa4PropertyId(event.target.value)}
+                    />
+                    <button
+                      disabled={busy === "ga4"}
+                      type="button"
+                      onClick={() => void connectGa4()}
+                    >
+                      Connect with Google
+                    </button>
+                  </>
                 ) : null}
                 <button disabled={busy === item.provider} type="submit">
                   Save

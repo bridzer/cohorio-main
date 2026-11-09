@@ -209,9 +209,15 @@ scripts**. It calls provider HTTP APIs directly with the workspace credential.
 Responses report only whether a provider is configured.
 
 - **Resend**: paste an API key. Lifecycle drafts can then be sent one at a time.
-- **GA4**: paste an OAuth access token with Analytics read access plus the
-  numeric property id. Commerce Analytics then shows 28-day sessions next to
-  Shopify net sales; otherwise it shows `GA4 is not connected.`
+- **GA4**: use **Connect with Google** (OAuth, read-only Analytics scope) and
+  then save the numeric property id — the connection refreshes itself and
+  lasts until revoked. The Google OAuth client (`AUTH_GOOGLE_ID` /
+  `AUTH_GOOGLE_SECRET`) needs `${APP_URL}/api/integrations/ga4/oauth/callback`
+  as an authorized redirect URI. Or paste
+  `{"refreshToken":"…","propertyId":"…"}` (verified on save), or a bare OAuth
+  access token plus the property id — a pasted token expires in about an hour.
+  Commerce Analytics then shows 28-day sessions next to Shopify net sales;
+  otherwise it shows `GA4 is not connected.`
 - **Ad networks**: paste a JSON object.
   - `meta-ads`: `{"accessToken":"…","accountId":"…"}`
   - `google-ads`: `{"accessToken":"…","developerToken":"…","customerId":"…"}`
@@ -228,14 +234,22 @@ tools; nothing in a connector writes to the provider.
 | Provider | Credential | Agent tools |
 |---|---|---|
 | `meta-ads` | `{"accessToken":"…","accountId":"act_…"}` | Campaign/ad set/ad results (spend, CTR, CPC, purchases, ROAS, leads); campaign list |
+| `google-ads` | `{"refreshToken":"…","developerToken":"…","customerId":"123-456-7890"}` (optional `loginCustomerId`; a pasted `accessToken` works for ~1 hour) | Campaign results: impressions, clicks, cost, average CPC, CTR, conversions, conversion value |
 | `klaviyo` | Private key `pk_…` with campaigns, metrics and accounts read scopes | Campaign results attributed to Placed Order (Klaviyo allows ~2 report calls a minute) |
+| `mailchimp` | API key ending in `-us…` (the data-center suffix) | Recent sent campaigns: sends, opens, open rate, clicks, click rate |
 | `plausible` | `{"apiKey":"…","siteId":"example.com"}` (Plausible Cloud only) | Visitors, visits, pageviews, bounce rate, duration; by day, page, source, channel, country, device |
 | `dataforseo` | `{"login":"…","password":"API password"}` | Keyword volume, CPC and trend; current top Google results. **Each call is billed** to that DataForSEO account |
 
+GA4 is connected separately (above) and gives the agent a 28-day sessions
+tool with the same self-refreshing token.
+
 API versions are pinned in the connectors and must be kept current: Meta
-Marketing API `v25.0` (also used for publishing) and Klaviyo revision
-`2026-10-15`. Meta retires Marketing API versions about a year after release;
-Klaviyo retires revisions two years after release.
+Marketing API `v25.0` (also used for publishing), Google Ads API `v19` and
+Klaviyo revision `2026-10-15`. Meta retires Marketing API versions about a
+year after release; Klaviyo retires revisions two years after release.
+Google Ads refresh tokens are exchanged through the server's Google OAuth
+client (`AUTH_GOOGLE_*`); without it, refresh-token credentials cannot be
+verified or used.
 
 Every other provider in the list can store a key, shown as **Saved · not
 verified**. Cohorio neither checks nor uses those keys until a connector is

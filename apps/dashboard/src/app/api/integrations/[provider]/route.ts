@@ -37,6 +37,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
       apiKey?: unknown;
       propertyId?: unknown;
     };
+    const ga4PropertyOnly =
+      provider === "ga4" &&
+      (typeof body.apiKey !== "string" || !body.apiKey.trim());
+    if (ga4PropertyOnly) {
+      // Connected with Google: only the property id is being set.
+      const propertyId =
+        typeof body.propertyId === "string" ? body.propertyId.trim() : "";
+      if (!isGa4PropertyId(propertyId)) {
+        return errorResponse("GA4 property id must be 6 to 12 digits.", 400);
+      }
+      const updated = await saveGa4PropertyId(access.workspaceId, propertyId);
+      if (!updated) {
+        return errorResponse("Connect GA4 with Google first, or paste a credential.", 400);
+      }
+      return NextResponse.json({ provider, configured: true, verified: true });
+    }
     if (typeof body.apiKey !== "string" || !body.apiKey.trim()) {
       return errorResponse("API key is too short.", 400);
     }

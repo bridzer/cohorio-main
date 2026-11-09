@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { listWorkspaceAssets } from "@/lib/assets";
 import { fetchPublicText, PublicUrlError } from "@/lib/http/public-url";
-import { fetchSessions } from "@/lib/integrations/ga4";
+import { fetchSessions, resolveGa4AccessToken } from "@/lib/integrations/ga4";
 import { loadGa4Settings } from "@/lib/integrations/store";
 import { workspaceContextMarkdown } from "@/lib/marketing-context-prompt";
 import { analyzeProductCro } from "@/lib/shopify/product-cro";
@@ -156,7 +156,8 @@ export const ga4Sessions = defineTool({
     if (!settings?.propertyId) {
       return { configured: false, message: "GA4 is not connected." };
     }
-    const sessions = await fetchSessions(settings.propertyId, settings.accessToken);
+    const accessToken = await resolveGa4AccessToken(settings, ctx.signal);
+    const sessions = await fetchSessions(settings.propertyId, accessToken);
     return { configured: true, range: "Last 28 days", sessions };
   },
 });

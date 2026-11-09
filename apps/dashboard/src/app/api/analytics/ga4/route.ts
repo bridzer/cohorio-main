@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fetchSessions } from "@/lib/integrations/ga4";
+import { fetchSessions, resolveGa4AccessToken } from "@/lib/integrations/ga4";
 import { loadGa4Settings } from "@/lib/integrations/store";
 import {
   accessErrorResponse,
@@ -21,10 +21,8 @@ export async function GET() {
     if (!settings?.propertyId) {
       return NextResponse.json({ configured: false });
     }
-    const sessions = await fetchSessions(
-      settings.propertyId,
-      settings.accessToken,
-    );
+    const accessToken = await resolveGa4AccessToken(settings);
+    const sessions = await fetchSessions(settings.propertyId, accessToken);
     return NextResponse.json({
       configured: true,
       sessions,

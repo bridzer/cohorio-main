@@ -9,7 +9,9 @@ import type { AgentContext } from "@/lib/agent/types";
 import { testProvider } from "../adapter";
 import { CONNECTORS, connectedTools } from ".";
 import { connector as dataforseo, summarizeVolumes } from "./dataforseo";
+import { connector as googleAds, GOOGLE_ADS_VERSION, summarizeGoogleAdsRows } from "./google-ads";
 import { connector as klaviyo, KLAVIYO_REVISION, summarizeCampaignReport } from "./klaviyo";
+import { connector as mailchimp, summarizeCampaigns } from "./mailchimp";
 import { connector as metaAds, META_GRAPH_VERSION, summarizeInsights } from "./meta-ads";
 import { connector as plausible, namedRows } from "./plausible";
 
@@ -46,7 +48,7 @@ describe("connector registry", () => {
     for (const connector of Object.values(CONNECTORS)) {
       for (const tool of connector.tools) expect(tool.tier).toBe("read");
     }
-    expect(connectedTools(["klaviyo", "mailchimp"]).map((tool) => tool.name)).toEqual([
+    expect(connectedTools(["klaviyo", "stripe"]).map((tool) => tool.name)).toEqual([
       "klaviyo_campaign_performance",
     ]);
   });
@@ -76,6 +78,21 @@ describe("credential formats", () => {
     expect(plausible.parse('{"apiKey":"k","siteId":"Acme.com"}')).toEqual({ apiKey: "k", siteId: "acme.com" });
     expect(() => plausible.parse('{"apiKey":"k","siteId":"https://acme.com/x"}')).toThrow(RangeError);
     expect(() => dataforseo.parse('{"login":"a"}')).toThrow(/password/);
+    expect(mailchimp.parse("testkeytestkeytestkeytestkey01-us21")).toEqual({
+      apiKey: "testkeytestkeytestkeytestkey01-us21",
+      dataCenter: "us21",
+    });
+    expect(() => mailchimp.parse("no-data-center")).toThrow(/data center/);
+    expect(
+      googleAds.parse('{"accessToken":"t","developerToken":"d","customerId":"123-456-7890"}'),
+    ).toEqual({
+      developerToken: "d",
+      customerId: "1234567890",
+      loginCustomerId: null,
+      refreshToken: null,
+      accessToken: "t",
+    });
+    expect(() => googleAds.parse('{"developerToken":"d","customerId":"1234567890"}')).toThrow(/refreshToken/);
   });
 });
 
@@ -103,7 +120,7 @@ describe("testProvider", () => {
   });
 
   it("stores keys for providers without a connector but does not claim they are verified", async () => {
-    expect(await testProvider("mailchimp", "abcdefgh-us1")).toEqual({ ok: true, verified: false });
+    expect(await testProvider("stripe", "abcdefgh-us1")).toEqual({ ok: true, verified: false });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -208,6 +225,68 @@ describe("Plausible", () => {
 
   it("handles rows with missing values", () => {
     expect(namedRows({ results: [{ metrics: [5] }] }, ["visitors", "visits"], [])).toEqual([{ visitors: 5, visits: null }]);
+  });
+});
+
+describe("Mailchimp", () => {
+  it("pings the key's data center to verify and lists sent campaigns", async () => {
+    mocks.load.mockResolvedValue("testkeytestkeytestkeytestkey01-us21");
+    fetchMock.mockResolvedValue(json({
+      campaigns: [{
+        id: "c1", send_time: "2026-10-01T10:00:00Z", emails_sent: 1000,
+        settings: { subject_line: "October launch" },
+        report_summary: { opens: 500, unique_opens: 420, open_rate: 0.42, clicks: 90, subscriber_clicks: 60, click_rate: 0.06 },
+      }],
+    }));
+    const outcome = await runToolCall(allTools, ctx, call("mailchimp_campaign_performance", { limit: 5 }));
+    expect(outcome.step.status).toBe("ok");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("https://us21.api.mailchimp.com/3.0/campaigns?");
+    expect(String(url)).toContain("status=sent");
+    expect(init?.headers).toMatchObject({
+      Authorization: `Basic ${Buffer.from("cohorio:testkeytestkeytestkeytestkey01-us21").toString("base64")}`,
+    });
+    expect(JSON.parse(outcome.content).campaigns[0]).toMatchObject({
+      name: "October launch", emailsSent: 1000, openRate: 0.42, subscriberClicks: 60,
+    });
+  });
+
+  it("verifies against /ping on the key's data center", async () => {
+    fetchMock.mockResolvedValueOnce(json({ health_status: "Everything's Chimpy!" }));
+    expect(await testProvider("mailchimp", "testkeytestkeytestkeytestkey01-eu2")).toEqual({ ok: true, verified: true });
+    expect(String(fetchMock.mock.calls[0][0])).toBe("https://eu2.api.mailchimp.com/3.0/ping");
+  });
+
+  it("names campaigns by subject, then title, then a fallback", () => {
+    expect(summarizeCampaigns({ campaigns: [{ settings: { title: "T" } }, {}] }).map((row) => row.name))
+      .toEqual(["T", "Untitled campaign"]);
+  });
+});
+
+describe("Google Ads", () => {
+  it("searches the customer with developer token and flattens micros", async () => {
+    mocks.load.mockResolvedValue('{"accessToken":"tok","developerToken":"dev","customerId":"123-456-7890"}');
+    fetchMock.mockResolvedValue(json([{
+      results: [{
+        campaign: { id: "7", name: "Search", status: "ENABLED" },
+        metrics: { impressions: "1000", clicks: "50", costMicros: "25000000", averageCpc: "500000", ctr: 0.05, conversions: 3, conversionsValue: 210 },
+      }],
+    }]));
+    const outcome = await runToolCall(allTools, ctx, call("google_ads_performance", { dateRange: "last_7d" }));
+    expect(outcome.step.status).toBe("ok");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(`https://googleads.googleapis.com/${GOOGLE_ADS_VERSION}/customers/1234567890/googleAds:searchStream`);
+    expect(init?.headers).toMatchObject({ Authorization: "Bearer tok", "developer-token": "dev" });
+    expect(JSON.parse(String(init?.body)).query).toContain("DURING LAST_7_DAYS");
+    expect(JSON.parse(outcome.content).rows[0]).toMatchObject({
+      campaign: "Search", impressions: 1000, clicks: 50, cost: 25, averageCpc: 0.5, conversions: 3,
+    });
+  });
+
+  it("reports missing metrics as null, not zero", () => {
+    expect(summarizeGoogleAdsRows([{ campaign: { name: "x" } }])[0]).toMatchObject({
+      impressions: null, cost: null, conversions: null,
+    });
   });
 });
 
