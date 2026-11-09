@@ -1,6 +1,6 @@
 import type { AgentMessage, ModelUsage, ToolCall, ToolModel } from "@/lib/llm/client";
 import { runToolCall, toolDefinitions, TOOL_RESULT_LIMIT, type ToolCallOutcome } from "./registry";
-import { delegateTask } from "./tools/delegate";
+import { delegateTask, delegateTaskInput, type DelegateTaskInput } from "./tools/delegate";
 import type { AgentContext, AgentEvent, AgentTool, PendingAction, ToolStep } from "./types";
 
 export type AgentLimits = {
@@ -99,7 +99,7 @@ export async function runAgent(input: {
   const runDelegation = async (call: ToolCall): Promise<ToolCallOutcome> => {
     const started = Date.now();
     const delegate = input.delegate;
-    let parsed: { task: string; skill?: string } | null = null;
+    let parsed: DelegateTaskInput | null = null;
     const finish = (status: ToolStep["status"], payload: unknown): ToolCallOutcome => {
       const text = typeof payload === "string" ? payload : JSON.stringify(payload);
       const body =
@@ -120,7 +120,7 @@ export async function runAgent(input: {
       return finish("error", { error: "Delegation is not available in this run." });
     }
     try {
-      parsed = delegateTask.input.parse(JSON.parse(call.function.arguments || "{}"));
+      parsed = delegateTaskInput.parse(JSON.parse(call.function.arguments || "{}"));
     } catch {
       return finish("error", {
         error: "delegate_task needs a task of at least a sentence (and an optional skill id).",
