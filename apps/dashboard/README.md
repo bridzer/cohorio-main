@@ -202,7 +202,8 @@ against the budget, from `GET /api/billing`.
 
 ## Connected tools
 
-`/settings/integrations` stores one credential per workspace and provider,
+`/connections` (linked from the dashboard's Connections nav and from
+Settings) stores one credential per workspace and provider,
 encrypted with `SHOPIFY_TOKEN_ENCRYPTION_KEY`. The provider list mirrors the
 file names in `tools/clis/`, but **the dashboard never executes those CLI
 scripts**. It calls provider HTTP APIs directly with the workspace credential.

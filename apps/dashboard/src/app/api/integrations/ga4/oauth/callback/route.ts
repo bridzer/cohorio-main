@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 
 function settingsRedirect(status: "connected" | "error", message?: string) {
   const appUrl = (process.env.APP_URL ?? process.env.AUTH_URL ?? "http://localhost:3000").replace(/\/$/, "");
-  const redirect = new URL("/settings/integrations", appUrl);
+  const redirect = new URL("/connections", appUrl);
   redirect.searchParams.set("ga4", status);
   if (message) redirect.searchParams.set("message", message);
   return redirect;

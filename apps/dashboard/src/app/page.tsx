@@ -179,6 +179,7 @@ const navItems: { label: string; icon: IconName }[] = [
 const navRoutes: Record<string, string> = {
   "Ask Cohorio": "/agent",
   Assets: "/library",
+  Connections: "/connections",
   Commerce: "/commerce",
   RevOps: "/revops",
   Launch: "/launch",
@@ -630,29 +631,6 @@ export default function Home() {
               >
                 Open Commerce <Icon name="arrow" size={16} />
               </button>
-            </section>
-          ) : activeNav === "Connections" ? (
-            <section className="workspace-panel">
-              <div className="section-heading">
-                <div>
-                  <h2>Connections</h2>
-                  <p>Shopify stores and team access for this workspace.</p>
-                </div>
-              </div>
-              <div className="connection-links">
-                <button
-                  className="manage-button"
-                  onClick={() => router.push("/commerce")}
-                >
-                  Shopify stores <Icon name="arrow" size={16} />
-                </button>
-                <button
-                  className="manage-button"
-                  onClick={() => router.push("/settings")}
-                >
-                  Team members <Icon name="arrow" size={16} />
-                </button>
-              </div>
             </section>
           ) : (
             <>

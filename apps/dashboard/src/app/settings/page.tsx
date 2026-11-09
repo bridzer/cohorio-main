@@ -428,7 +428,7 @@ export default function SettingsPage() {
             <h2>Marketing tools</h2>
             <p>Connect Resend, GA4, ad networks, and other tools for this workspace.</p>
           </div>
-          <Link href="/settings/integrations" className="settings-back">
+          <Link href="/connections" className="settings-back">
             Manage connections
           </Link>
         </section>
