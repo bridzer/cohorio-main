@@ -359,3 +359,23 @@ of silently skipping. `COHORIO_LLM_PROVIDER`, `COHORIO_LLM_BASE_URL` and
 `COHORIO_LLM_MODEL` repository variables can point the run at a cheaper model.
 Results land in the run summary and as an `eval-report` artifact kept for
 30 days.
+
+## Delegated subtasks
+
+The agent can hand a self-contained research or analysis subtask to a
+subagent with `delegate_task`. The subagent gets the same Brand Brain,
+memories and connected data tools, but only the read tier: it cannot save
+drafts, remember preferences, send or publish, and it has none of the
+conversation history, so the delegating agent must put every needed fact in
+the task text. It may load a playbook when the delegating agent names one.
+
+Limits are deliberately tight: at most 3 delegations per run, each capped at
+6 model steps, 12 tool calls and 80,000 tokens, and the subagent's tokens are
+drawn from — and recorded against — the parent run's 250,000-token budget,
+cost and plan spend. Delegation is one level deep (a subagent cannot
+delegate), and drafts, approvals and the final answer always stay with the
+main agent. In the conversation the delegation appears as a single
+"Delegated a subtask" step with the findings as its result.
+
+Exposing Cohorio's tools to external agent clients over MCP is future work;
+it is intentionally not part of this step.

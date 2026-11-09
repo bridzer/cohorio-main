@@ -119,4 +119,77 @@ describe("runAgent", () => {
     const result = await runAgent({ ctx, messages: start, tools: AGENT_TOOLS, model });
     expect(result.skillsLoaded).toEqual(["ad-creative"]);
   });
+
+  it("delegates a subtask to a read-only subagent and folds in its usage and skills", async () => {
+    const createMessages = vi.fn(({ task }: { task: string; skill?: string }) => [
+      { role: "user" as const, content: task },
+    ]);
+    const model = scripted(
+      toolTurn(["delegate_task", { task: "Check how the Acme store is doing lately." }]),
+      toolTurn(["load_skill", { skill: "ad-creative" }]),
+      textTurn("Findings: one store, Acme, is active."),
+      textTurn("Here is the store summary."),
+    );
+    const result = await runAgent({
+      ctx,
+      messages: start,
+      tools: AGENT_TOOLS,
+      model,
+      delegate: { createMessages, tools: AGENT_TOOLS },
+    });
+
+    expect(result.output).toBe("Here is the store summary.");
+    expect(result.steps).toEqual([expect.objectContaining({ tool: "delegate_task", status: "ok" })]);
+    expect(result.skillsLoaded).toEqual(["ad-creative"]);
+    expect(result.usage).toEqual({ promptTokens: 400, completionTokens: 120, modelCalls: 4 });
+    expect(createMessages).toHaveBeenCalledWith(
+      expect.objectContaining({ task: "Check how the Acme store is doing lately." }),
+    );
+    // The subagent (second model call) sees read tools only: no delegate_task,
+    // no draft tools, no external tools.
+    const subToolNames = model.mock.calls[1][0].tools.map((tool) => tool.function.name);
+    expect(subToolNames).toContain("list_shopify_stores");
+    expect(subToolNames).toContain("load_skill");
+    expect(subToolNames).not.toContain("delegate_task");
+    expect(subToolNames).not.toContain("save_social_posts");
+    expect(subToolNames).not.toContain("send_lifecycle_email");
+    // The parent receives the subagent's findings as the tool result.
+    const parentReplies = model.mock.calls[3][0].messages.filter((m) => m.role === "tool");
+    expect(parentReplies.at(-1)?.content).toContain("Findings: one store, Acme, is active.");
+  });
+
+  it("stops delegating at the per-run cap without spending model calls", async () => {
+    const model = scripted(
+      toolTurn(["delegate_task", { task: "First subtask: check the store." }]),
+      textTurn("Findings one."),
+      toolTurn(["delegate_task", { task: "Second subtask: check it again." }]),
+      textTurn("Final answer."),
+    );
+    const result = await runAgent({
+      ctx,
+      messages: start,
+      tools: AGENT_TOOLS,
+      model,
+      delegate: {
+        createMessages: ({ task }) => [{ role: "user" as const, content: task }],
+        tools: AGENT_TOOLS,
+        maxDelegations: 1,
+      },
+    });
+
+    expect(result.output).toBe("Final answer.");
+    expect(result.steps.map((step) => step.status)).toEqual(["ok", "error"]);
+    expect(result.usage.modelCalls).toBe(4);
+    const replies = model.mock.calls[3][0].messages.filter((m) => m.role === "tool");
+    expect(replies.at(-1)?.content).toContain("Delegation limit reached");
+  });
+
+  it("treats delegate_task as unknown when the run has no delegate configured", async () => {
+    const model = scripted(
+      toolTurn(["delegate_task", { task: "Check the store for me please." }]),
+      textTurn("done"),
+    );
+    const result = await runAgent({ ctx, messages: start, tools: AGENT_TOOLS, model });
+    expect(result.steps[0]).toMatchObject({ tool: "delegate_task", status: "error" });
+  });
 });

@@ -43,6 +43,9 @@ export async function runWorkspaceAgent(input: {
     workspaceContextMarkdown(input.ctx.workspaceId),
     listConfiguredProviders(input.ctx.workspaceId),
   ]);
+  const tools = [...AGENT_TOOLS, ...connectedTools(providers)];
+  const connected = connectedLabels(providers);
+  const model = input.model ?? completeWithTools;
   return runAgent({
     ctx: input.ctx,
     messages: agentMessages({
@@ -50,13 +53,32 @@ export async function runWorkspaceAgent(input: {
       brandMarkdown,
       memories: input.memories,
       history: input.history,
-      connected: connectedLabels(providers),
+      connected,
       workspaceName: input.workspaceName,
       prompt: input.prompt,
     }),
-    tools: [...AGENT_TOOLS, ...connectedTools(providers)],
-    model: input.model ?? completeWithTools,
+    tools,
+    model,
     limits: input.limits,
+    delegate: {
+      tools,
+      createMessages: ({ task, skill }) =>
+        agentMessages({
+          skills,
+          brandMarkdown,
+          memories: input.memories,
+          connected,
+          workspaceName: input.workspaceName,
+          prompt: [
+            "You are a subagent handling one delegated subtask for Cohorio. You have read-only tools and no conversation history. Research with tools, then report concrete findings with the numbers and sources you used. Do not draft, save, send or publish anything.",
+            skill ? `Load the "${skill}" skill first and follow its playbook.` : "",
+            "",
+            task,
+          ]
+            .filter(Boolean)
+            .join("\n"),
+        }),
+    },
     onEvent: input.onEvent,
   });
 }

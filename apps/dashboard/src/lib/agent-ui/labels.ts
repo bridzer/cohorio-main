@@ -1,4 +1,5 @@
 const TOOL_LABELS: Record<string, string> = {
+  delegate_task: "Delegated a subtask",
   load_skill: "Loaded a playbook",
   read_skill_reference: "Read a playbook reference",
   list_assets: "Checked saved work",
@@ -29,6 +30,7 @@ const TOOL_LABELS: Record<string, string> = {
 };
 
 const TOOL_IN_PROGRESS: Record<string, string> = {
+  delegate_task: "Delegating a subtask",
   load_skill: "Loading a playbook",
   read_skill_reference: "Reading a playbook reference",
   fetch_url: "Reading a web page",
