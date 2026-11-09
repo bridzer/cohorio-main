@@ -336,3 +336,26 @@ up to 50 per workspace. `/agent/memories` lists them, and workspace members can
 add, edit or delete them there. Memories reach the agent as reference data,
 never as instructions; never store secrets or personal data in one.
 Conversations and memory changes are recorded on the Activity page.
+
+## Agent evals
+
+`src/lib/agent/evals/` holds golden cases that run the real agent loop,
+playbooks and tools against fixture data (never a live database or provider),
+then score the answer with deterministic checks plus an LLM judge (4/5 to
+pass) where a case has a rubric. Cases cover grounding in each connector's
+reports (Meta Ads, Google Ads, Mailchimp, GA4), memory application and memory
+injection, approval gating for sends and publishes, and drafting without
+sending.
+
+They call the configured language model, so they are not part of `npm test`.
+Run them locally with `npm run eval` (reads `COHORIO_LLM_*` from `.env.local`;
+`EVAL_CASE=<id>` runs one case, `EVAL_REPEATS=<n>` repeats to expose flakes).
+Each run writes `eval-report.json` and exits non-zero when a case fails.
+
+The **Agent evals** GitHub workflow runs on demand from the Actions tab and
+automatically every Monday at 06:17 UTC. It requires the
+`COHORIO_LLM_API_KEY` repository secret; without it the workflow fails instead
+of silently skipping. `COHORIO_LLM_PROVIDER`, `COHORIO_LLM_BASE_URL` and
+`COHORIO_LLM_MODEL` repository variables can point the run at a cheaper model.
+Results land in the run summary and as an `eval-report` artifact kept for
+30 days.

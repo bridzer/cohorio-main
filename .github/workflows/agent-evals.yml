@@ -1,50 +1,99 @@
+# Live agent evals against the real model. These cost money (a full run is a few
+# dollars with an Opus-class model), so they never run on push:
+# - manually from the Actions tab (workflow_dispatch), or
+# - weekly, Monday 06:17 UTC, when the COHORIO_LLM_API_KEY secret is set.
+# Without the secret the run FAILS instead of silently skipping every case, so
+# a broken schedule is visible. Tool calls run against fixtures only — no real
+# database or provider is touched. Configure COHORIO_LLM_MODEL /
+# COHORIO_LLM_BASE_URL / COHORIO_LLM_PROVIDER as repository variables to point
+# the evals at a cheaper or different model.
 name: Agent evals
 
-# Live evals call the configured language model and cost tokens, so they run
-# only on demand. Add COHORIO_LLM_API_KEY (and optionally the base URL/model)
-# as repository secrets/variables first.
 on:
   workflow_dispatch:
     inputs:
       case:
-        description: "Run a single case id (empty runs all)"
+        description: "Single case id to run (blank = all cases)"
         required: false
         default: ""
       repeats:
-        description: "Times to run each case, to expose flaky behaviour"
+        description: "Runs per case (use 3 to expose flakes)"
         required: false
         default: "1"
+  schedule:
+    - cron: "17 6 * * 1"
+
+permissions:
+  contents: read
 
 jobs:
   evals:
+    name: Live agent evals
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
+    env:
+      COHORIO_LLM_PROVIDER: ${{ vars.COHORIO_LLM_PROVIDER }}
+      COHORIO_LLM_BASE_URL: ${{ vars.COHORIO_LLM_BASE_URL }}
+      COHORIO_LLM_MODEL: ${{ vars.COHORIO_LLM_MODEL }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: 20
           cache: npm
-
       - name: Install dependencies
         run: npm ci
-
+      - name: Require the model key
+        env:
+          COHORIO_LLM_API_KEY: ${{ secrets.COHORIO_LLM_API_KEY }}
+        run: |
+          if [ -z "$COHORIO_LLM_API_KEY" ]; then
+            echo "::error title=Missing secret::COHORIO_LLM_API_KEY is not set, so every eval would be skipped. Add it under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
       - name: Run agent evals
         env:
           COHORIO_LLM_API_KEY: ${{ secrets.COHORIO_LLM_API_KEY }}
-          COHORIO_LLM_BASE_URL: ${{ vars.COHORIO_LLM_BASE_URL }}
-          COHORIO_LLM_MODEL: ${{ vars.COHORIO_LLM_MODEL }}
           EVAL_CASE: ${{ inputs.case }}
-          EVAL_REPEATS: ${{ inputs.repeats }}
+          EVAL_REPEATS: ${{ inputs.repeats || '1' }}
         run: npm run eval --workspace=cohorio-dashboard
-
+      - name: Summarize the eval report
+        if: always()
+        working-directory: apps/dashboard
+        run: |
+          node --input-type=module <<'EOF'
+          import { appendFileSync, existsSync, readFileSync } from "node:fs";
+          const reportPath = "eval-report.json";
+          let lines;
+          if (!existsSync(reportPath)) {
+            lines = [
+              "## Agent evals",
+              "",
+              "No eval report was written — the run failed before finishing (see the step log).",
+            ];
+          } else {
+            const report = JSON.parse(readFileSync(reportPath, "utf8"));
+            lines = [
+              "## Agent evals",
+              "",
+              `Model \`${report.model}\` · **${report.passed}/${report.total} passed** · ${Number(report.tokens).toLocaleString()} tokens`,
+              "",
+              "| Case | Result | Judge | Time | Failures |",
+              "| --- | --- | --- | --- | --- |",
+              ...report.results.map(
+                (r) =>
+                  `| ${r.id} | ${r.passed ? "PASS" : "**FAIL**"} | ${r.judge ? `${r.judge.score}/5` : "—"} | ${(r.durationMs / 1000).toFixed(1)}s | ${r.failures.join("; ").replaceAll("|", "/") || "—"} |`,
+              ),
+            ];
+          }
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`);
+          console.log(lines.join("\n"));
+          EOF
       - name: Upload eval report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: agent-eval-report
+          name: eval-report
           path: apps/dashboard/eval-report.json
-          if-no-files-found: warn
+          if-no-files-found: ignore
+          retention-days: 30
