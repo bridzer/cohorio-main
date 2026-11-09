@@ -120,7 +120,10 @@ export async function runAgent(input: {
       return finish("error", { error: "Delegation is not available in this run." });
     }
     try {
-      parsed = delegateTask.input.parse(JSON.parse(call.function.arguments || "{}"));
+      parsed = delegateTask.input.parse(JSON.parse(call.function.arguments || "{}")) as {
+        task: string;
+        skill?: string;
+      };
     } catch {
       return finish("error", {
         error: "delegate_task needs a task of at least a sentence (and an optional skill id).",
