@@ -202,7 +202,7 @@ export default function SettingsPage() {
   const canAdmin = data.access.role === "owner" || data.access.role === "admin";
 
   return (
-    <main className="settings-shell">
+    <main className="settings-shell" id="main-content">
       <header className="settings-header">
         <Link href="/" className="settings-brand">
           <span>C</span> Cohorio

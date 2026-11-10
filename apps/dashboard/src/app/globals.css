@@ -1259,7 +1259,11 @@ button {
   }
 
   .quick-prompts {
-    display: none;
+    flex-wrap: wrap;
+  }
+
+  .quick-prompts button {
+    min-height: 40px;
   }
 
   .section-heading {
@@ -1296,5 +1300,168 @@ button {
 
   .invite-button {
     padding: 0 10px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsive + accessibility foundation (applies site-wide)           */
+/* ------------------------------------------------------------------ */
+
+html,
+body {
+  overflow-x: clip;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+:focus-visible {
+  outline: 3px solid #2f6f4f;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 200;
+  transform: translateY(-300%);
+  border-radius: 8px;
+  background: #173c31;
+  padding: 10px 16px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.skip-link:focus-visible {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Contrast: these greys were below comfortable reading contrast. */
+.eyebrow {
+  color: #5f6a63 !important;
+}
+
+.nav-label {
+  color: #68716b;
+}
+
+.workspace-switcher span,
+.user-row span,
+.usage-pill span {
+  color: #6d766e;
+}
+
+/* Mobile section navigation — hidden until the sidebar disappears. */
+.mobile-nav,
+.commerce-mobile-nav,
+.social-mobile-nav {
+  display: none;
+}
+
+.mobile-nav button,
+.mobile-nav a,
+.commerce-mobile-nav button,
+.commerce-mobile-nav a,
+.social-mobile-nav button,
+.social-mobile-nav a {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  border: 1px solid #e2e5de;
+  border-radius: 99px;
+  background: #fff;
+  padding: 0 14px;
+  color: #435047;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.mobile-nav button.active,
+.commerce-mobile-nav button.active,
+.social-mobile-nav button.active {
+  border-color: #173c31;
+  background: #173c31;
+  color: #fff;
+}
+
+@media (max-width: 820px) {
+  .mobile-nav {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    border-bottom: 1px solid #e2e5df;
+    background: rgb(245 246 242 / 92%);
+    padding: 10px 18px;
+    scrollbar-width: none;
+  }
+
+  .mobile-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 16px form text stops iOS Safari zooming in on focus. */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+@media (max-width: 800px) {
+  .commerce-mobile-nav,
+  .social-mobile-nav {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    border-bottom: 1px solid #e2e5df;
+    background: rgb(248 249 246 / 92%);
+    padding: 10px 16px;
+    scrollbar-width: none;
+  }
+
+  .commerce-mobile-nav::-webkit-scrollbar,
+  .social-mobile-nav::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .nav-item,
+  .invite-button {
+    min-height: 44px;
+  }
+
+  .icon-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
   }
 }

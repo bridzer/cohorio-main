@@ -241,7 +241,7 @@ export default function ConnectionsPage() {
   };
 
   return (
-    <main className="settings-shell">
+    <main className="settings-shell" id="main-content">
       <header className="settings-header">
         <Link href="/" className="settings-brand">
           <span>C</span> Cohorio
@@ -388,7 +388,7 @@ export default function ConnectionsPage() {
             if (event.target === event.currentTarget) setSelected(null);
           }}
         >
-          <div className="integration-dialog" role="dialog" aria-modal="true">
+          <div className="integration-dialog" role="dialog" aria-modal="true" aria-labelledby="integration-dialog-title">
             {(() => {
               const meta = providerMeta(selectedItem.provider);
               const tile = CATEGORY_TILES[meta.category] ?? CATEGORY_TILES.other;
@@ -411,7 +411,7 @@ export default function ConnectionsPage() {
                       ×
                     </button>
                   </div>
-                  <h2>{selectedItem.configured ? `Manage ${meta.name}` : `Connect ${meta.name}`}</h2>
+                  <h2 id="integration-dialog-title">{selectedItem.configured ? `Manage ${meta.name}` : `Connect ${meta.name}`}</h2>
                   <p className="integration-blurb">{meta.blurb}</p>
                   <p className="integration-note">{capabilityNote(selectedItem)}</p>
                   <form onSubmit={(event) => void save(event, selectedItem.provider)}>
@@ -419,6 +419,7 @@ export default function ConnectionsPage() {
                       {selectedItem.configured ? "Replace API key" : "API key"}
                       <input
                         type="password"
+                        autoFocus
                         autoComplete="off"
                         name={`${selectedItem.provider}-key`}
                         placeholder={

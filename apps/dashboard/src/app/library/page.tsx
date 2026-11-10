@@ -52,7 +52,7 @@ export default function LibraryPage() {
   }, []);
 
   return (
-    <main className="library-page">
+    <main className="library-page" id="main-content">
       <p>
         <Link href="/">Back to Co-Pilot</Link>
       </p>

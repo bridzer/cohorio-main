@@ -630,7 +630,7 @@ export default function SocialStudio() {
         </div>
       </aside>
 
-      <main className="social-main">
+      <main className="social-main" id="main-content">
         <header className="social-topbar">
           <div className="social-mobile-brand">
             <BrandMark />
@@ -652,6 +652,30 @@ export default function SocialStudio() {
             </button>
           </div>
         </header>
+
+        <nav className="social-mobile-nav" aria-label="Social studio">
+          {(
+            [
+              ["Create", icons.create],
+              ["Calendar", icons.calendar],
+              ["Library", icons.library],
+              ["Analytics", icons.analytics],
+            ] as [View, ReactNode][]
+          ).map(([label, icon]) => (
+            <button
+              key={label}
+              type="button"
+              className={view === label ? "active" : ""}
+              aria-current={view === label ? "page" : undefined}
+              onClick={() => setView(label)}
+            >
+              <Glyph size={16}>{icon}</Glyph>
+              {label}
+            </button>
+          ))}
+          <Link href="/">Main dashboard</Link>
+          <Link href="/settings">Settings</Link>
+        </nav>
 
         <div className="social-content">
           {view === "Calendar" ? (

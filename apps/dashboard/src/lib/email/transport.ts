@@ -56,6 +56,9 @@ function smtpTransporter() {
         host: config.host,
         port: config.port,
         secure: config.secure,
+        // Gmail advertises IPv6 addresses; on networks without a working
+        // IPv6 route Node hangs until the connection times out (ETIMEDOUT).
+        family: 4,
         // Port 587 upgrades with STARTTLS; never send credentials in clear text.
         requireTLS: !config.secure,
         auth: { user: config.user, pass: config.pass },
@@ -73,6 +76,27 @@ export async function verifySmtp() {
   await smtpTransporter().verify();
 }
 
+async function sendViaResend(email: PlatformEmail, from: string) {
+  const result = await new Resend(process.env.RESEND_API_KEY).emails.send({ from, ...email });
+  if (result.error) {
+    throw new Error(`Email delivery failed: Resend ${result.error.name} — ${result.error.message}`);
+  }
+  return { delivered: true } as const;
+}
+
+// Connection-level SMTP failures (timeouts, refused, DNS) say nothing about
+// the message itself; cloud networks frequently block outbound SMTP ports.
+const SMTP_CONNECTION_CODES = new Set([
+  "ETIMEDOUT",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "ECONNECTION",
+  "ESOCKET",
+  "EDNS",
+  "EAI_AGAIN",
+  "ENOTFOUND",
+]);
+
 /**
  * Sends one platform email. Returns delivered: false when no transport is
  * configured (development falls back to on-screen links). Throws with the
@@ -87,6 +111,16 @@ export async function sendPlatformEmail(email: PlatformEmail) {
       await smtpTransporter().sendMail({ from, ...email });
     } catch (error) {
       const detail = error as { code?: string; responseCode?: number; response?: string };
+      // SMTP port unreachable (common on Railway/cloud egress): fall back to
+      // Resend over HTTPS when it is configured, instead of failing sign-ups.
+      if (
+        detail.code &&
+        SMTP_CONNECTION_CODES.has(detail.code) &&
+        process.env.RESEND_API_KEY?.trim() &&
+        from
+      ) {
+        return sendViaResend(email, from);
+      }
       throw new Error(
         `Email delivery failed: SMTP ${detail.code ?? ""} ${detail.responseCode ?? ""} ${
           detail.response?.split("\n")[0]?.slice(0, 200) ?? (error instanceof Error ? error.message : "")
@@ -95,11 +129,7 @@ export async function sendPlatformEmail(email: PlatformEmail) {
     }
     return { delivered: true };
   }
-  const result = await new Resend(process.env.RESEND_API_KEY).emails.send({ from, ...email });
-  if (result.error) {
-    throw new Error(`Email delivery failed: Resend ${result.error.name} — ${result.error.message}`);
-  }
-  return { delivered: true };
+  return sendViaResend(email, from);
 }
 
 export function escapeHtml(value: string) {

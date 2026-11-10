@@ -84,7 +84,7 @@ export default function ActivityPage() {
   }, []);
 
   return (
-    <main className="automations-page">
+    <main className="automations-page" id="main-content">
       <p>
         <Link href="/agent" className="agent-back">
           ← Ask Cohorio

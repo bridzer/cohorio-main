@@ -2215,19 +2215,24 @@
   }
 
   .commerce-topbar {
-    padding: 0 16px;
+    height: auto;
+    min-height: 62px;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 16px;
   }
 
-  .commerce-connection {
-    display: none;
+  .commerce-title-row {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .commerce-range {
+    flex-wrap: wrap;
   }
 
   .commerce-title-row {
     align-items: flex-start;
-  }
-
-  .commerce-range {
-    display: none;
   }
 
   .commerce-metrics {

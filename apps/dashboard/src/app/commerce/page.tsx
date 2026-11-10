@@ -757,7 +757,7 @@ export default function CommerceSuite() {
         </div>
       </aside>
 
-      <main className="commerce-main">
+      <main className="commerce-main" id="main-content">
         <header className="commerce-topbar">
           <div className="commerce-mobile-brand">
             <BrandMark />
@@ -798,6 +798,31 @@ export default function CommerceSuite() {
             </a>
           </div>
         </header>
+
+        <nav className="commerce-mobile-nav" aria-label="Store workspace">
+          {(
+            [
+              ["Overview", icons.overview],
+              ["Products", icons.bag],
+              ["Campaigns", icons.megaphone],
+              ["Lifecycle", icons.lifecycle],
+              ["Analytics", icons.chart],
+            ] as [Section, ReactNode][]
+          ).map(([label, icon]) => (
+            <button
+              key={label}
+              type="button"
+              className={section === label ? "active" : ""}
+              aria-current={section === label ? "page" : undefined}
+              onClick={() => setSection(label)}
+            >
+              <Icon size={16}>{icon}</Icon>
+              {label}
+            </button>
+          ))}
+          <Link href="/">Main dashboard</Link>
+          <Link href="/settings">Settings</Link>
+        </nav>
 
         <div className="commerce-content">
           {(!shopifyConfigured || connectionMessage) && (

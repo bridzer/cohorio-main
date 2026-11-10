@@ -76,7 +76,7 @@ export default function RevopsPage() {
   }
 
   return (
-    <main className="settings-shell">
+    <main className="settings-shell" id="main-content">
       <header className="settings-header">
         <Link href="/" className="settings-brand">
           <span>C</span> Cohorio

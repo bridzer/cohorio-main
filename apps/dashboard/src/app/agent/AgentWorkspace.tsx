@@ -516,7 +516,7 @@ export function AgentWorkspace() {
   const empty = !shown && !live;
 
   return (
-    <div className="agent-shell">
+    <div className="agent-shell" id="main-content">
       <aside className="agent-sidebar" aria-label="Conversations">
         <Link href="/" className="agent-back">
           ← Home

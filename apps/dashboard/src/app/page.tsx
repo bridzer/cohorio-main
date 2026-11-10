@@ -473,6 +473,15 @@ export default function Home() {
     router.push("/agent");
   }
 
+  function openNav(label: string) {
+    const route = navRoutes[label];
+    if (route) {
+      router.push(route);
+      return;
+    }
+    setActiveNav(label);
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -502,14 +511,8 @@ export default function Home() {
             <button
               key={item.label}
               className={`nav-item ${activeNav === item.label ? "active" : ""}`}
-              onClick={() => {
-                const route = navRoutes[item.label];
-                if (route) {
-                  router.push(route);
-                  return;
-                }
-                setActiveNav(item.label);
-              }}
+              aria-current={activeNav === item.label && !navRoutes[item.label] ? "page" : undefined}
+              onClick={() => openNav(item.label)}
             >
               <Icon name={item.icon} size={19} />
               {item.label}
@@ -555,7 +558,7 @@ export default function Home() {
         </div>
       </aside>
 
-      <main className="main-content">
+      <main className="main-content" id="main-content">
         <header className="topbar">
           <div className="mobile-brand">
             <div className="brand-mark">
@@ -579,6 +582,26 @@ export default function Home() {
             </button>
           </div>
         </header>
+
+        <nav className="mobile-nav" aria-label="Main navigation">
+          {navItems.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              className={activeNav === item.label ? "active" : ""}
+              aria-current={activeNav === item.label && !navRoutes[item.label] ? "page" : undefined}
+              onClick={() => openNav(item.label)}
+            >
+              <Icon name={item.icon} size={17} />
+              {item.label}
+              {item.label === "Ask Cohorio" && <span className="nav-new">AI</span>}
+            </button>
+          ))}
+          <button type="button" onClick={() => router.push("/settings")}>
+            <Icon name="settings" size={17} />
+            Settings
+          </button>
+        </nav>
 
         <div className="content-wrap">
           {activeNav === "Assets" ? (

@@ -155,7 +155,7 @@ export default function ProductContextOnboarding() {
   const isOptional = OPTIONAL_SECTIONS.has(activeSection.id);
 
   return (
-    <main className="context-shell">
+    <main className="context-shell" id="main-content">
       <aside className="context-sidebar">
         <button className="context-brand" onClick={() => router.push("/")}>
           <span className="context-brand-mark">C</span>
