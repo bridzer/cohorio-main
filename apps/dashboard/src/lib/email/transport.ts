@@ -56,9 +56,6 @@ function smtpTransporter() {
         host: config.host,
         port: config.port,
         secure: config.secure,
-        // Gmail advertises IPv6 addresses; on networks without a working
-        // IPv6 route Node hangs until the connection times out (ETIMEDOUT).
-        family: 4,
         // Port 587 upgrades with STARTTLS; never send credentials in clear text.
         requireTLS: !config.secure,
         auth: { user: config.user, pass: config.pass },
