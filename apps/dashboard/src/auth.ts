@@ -39,6 +39,38 @@ const googleClientId =
 const googleClientSecret =
   process.env.AUTH_GOOGLE_SECRET ?? process.env.GOOGLE_OAUTH_CLIENT_SECRET;
 
+// After a store connects, merchants open this app inside the Shopify admin
+// iframe, where Auth.js cookies are third-party. With the default
+// SameSite=Lax cookies, the browser never stores or sends them in that
+// frame: the CSRF cookie set by GET /api/auth/csrf is missing from the
+// credentials POST (Auth.js throws MissingCSRF) and no session can persist.
+// In production, issue the auth cookies as cross-site CHIPS cookies
+// (SameSite=None + Secure + Partitioned) so Chrome-based embedded sessions
+// work. Browsers that block third-party cookies outright are covered by the
+// auth pages escaping the iframe to a top-level window (see EscapeIframe).
+// Development keeps the Auth.js defaults so plain-http localhost sign-in
+// keeps working.
+const embeddedCookieOptions = {
+  httpOnly: true,
+  sameSite: "none",
+  path: "/",
+  secure: true,
+  partitioned: true,
+} as const;
+const authCookies: NextAuthConfig["cookies"] =
+  process.env.NODE_ENV === "production"
+    ? {
+        sessionToken: { options: embeddedCookieOptions },
+        callbackUrl: { options: embeddedCookieOptions },
+        csrfToken: { options: embeddedCookieOptions },
+        pkceCodeVerifier: {
+          options: { ...embeddedCookieOptions, maxAge: 60 * 15 },
+        },
+        state: { options: { ...embeddedCookieOptions, maxAge: 60 * 15 } },
+        nonce: { options: embeddedCookieOptions },
+      }
+    : undefined;
+
 const providers: NextAuthConfig["providers"] = [
   Credentials({
     credentials: {
@@ -111,6 +143,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     error: "/sign-in",
   },
   trustHost: true,
+  cookies: authCookies,
   callbacks: {
     async signIn({ user, account, profile }) {
       if (account?.provider !== "google") return true;

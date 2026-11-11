@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BrandMark } from "./components/BrandMark";
+import { EscapeIframe } from "./EscapeIframe";
 
 export function AuthShell({
   eyebrow,
@@ -17,6 +18,7 @@ export function AuthShell({
 }) {
   return (
     <main className="auth-shell">
+      <EscapeIframe />
       <a className="auth-skip" href="#auth-form">
         Skip to sign in form
       </a>
