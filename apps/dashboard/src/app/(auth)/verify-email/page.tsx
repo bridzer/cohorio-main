@@ -48,7 +48,8 @@ function VerifyEmailContent() {
           redirect: false,
         });
         if (!result?.error) {
-          router.push("/auth/complete?returnTo=/");
+          // New accounts go straight to Brand setup, not the dashboard.
+          router.push("/auth/complete?returnTo=/onboarding");
           return;
         }
       }
@@ -81,8 +82,11 @@ function VerifyEmailContent() {
           <AuthAlert variant="success">
             Your organization is ready. Continue to your workspace.
           </AuthAlert>
-          <Link className="auth-button" href="/sign-in">
-            Continue to sign in
+          <Link
+            className="auth-button"
+            href={`/sign-in?callbackUrl=${encodeURIComponent("/onboarding")}`}
+          >
+            Continue to Brand setup
           </Link>
         </>
       )}
