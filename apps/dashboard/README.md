@@ -159,11 +159,15 @@ counts as one task.
 
 | Plan | Price (USD) | Tasks per UTC month |
 |------|-------------|---------------------|
-| `free` | $0 | 5 |
-| `pro` | $49/month | No cap |
-| `team` | $149/month | No cap |
+| `free` | $0 | 5 (`COHORIO_QUOTA_FREE_TASKS`) |
+| `pro` | $49/month | No cap (`COHORIO_QUOTA_PRO_TASKS`) |
+| `team` | $149/month | No cap (`COHORIO_QUOTA_TEAM_TASKS`) |
 
-A free workspace that has used 5 tasks this month gets HTTP 402 and no model
+Each plan's monthly task limit is an environment variable: unset means the
+table default, a non-negative integer sets the cap, and `unlimited` removes
+it. Anything else falls back to the default.
+
+A workspace that has used its plan's tasks this month gets HTTP 402 and no model
 call is made. Checkout uses Stripe when `STRIPE_SECRET_KEY` is set; point a
 Stripe webhook at `${APP_URL}/api/billing/webhook` with
 `STRIPE_WEBHOOK_SECRET` and subscribe to `checkout.session.completed`,

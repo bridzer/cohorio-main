@@ -94,7 +94,7 @@ describe("runAutomationJob", () => {
   });
 
   it("skips without calling the model when the monthly quota is used up", async () => {
-    mocks.quota.mockRejectedValue(new TaskQuotaError());
+    mocks.quota.mockRejectedValue(new TaskQuotaError("free", 5));
     await runAutomationJob(job());
     expect(mocks.runTurn).not.toHaveBeenCalled();
     expect(mocks.recordResult).toHaveBeenCalledWith("workspace-a", "auto-1",

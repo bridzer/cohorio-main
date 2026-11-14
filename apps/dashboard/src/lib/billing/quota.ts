@@ -5,14 +5,37 @@ export type WorkspacePlan = "free" | "pro" | "team";
 export type TaskKind = "copilot" | "social" | "lifecycle";
 
 export class TaskQuotaError extends Error {
-  constructor() {
-    super("Free plan includes 5 tasks per month.");
+  constructor(plan: WorkspacePlan, limit: number) {
+    super(
+      `${plan[0].toUpperCase()}${plan.slice(1)} plan includes ${limit} task${limit === 1 ? "" : "s"} per month.`,
+    );
     this.name = "TASK_QUOTA_EXCEEDED";
   }
 }
 
 type PlanRow = { plan: WorkspacePlan };
 type CountRow = { used: number };
+
+/**
+ * Monthly task limit per plan, from the environment. Unset means the default
+ * (5 for free, unlimited for pro and team). A non-negative integer sets the
+ * limit; "unlimited" removes it. Anything else falls back to the default so
+ * a typo fails open to known behavior rather than blocking all tasks.
+ */
+export function planTaskLimit(plan: WorkspacePlan): number | null {
+  const fallback = plan === "free" ? 5 : null;
+  const raw =
+    plan === "free"
+      ? process.env.COHORIO_QUOTA_FREE_TASKS
+      : plan === "pro"
+        ? process.env.COHORIO_QUOTA_PRO_TASKS
+        : process.env.COHORIO_QUOTA_TEAM_TASKS;
+  const value = raw?.trim().toLowerCase();
+  if (!value) return fallback;
+  if (value === "unlimited" || value === "null" || value === "none") return null;
+  if (/^\d+$/.test(value)) return Number(value);
+  return fallback;
+}
 
 export async function getWorkspaceUsage(workspaceId: string) {
   await query(
@@ -37,14 +60,14 @@ export async function getWorkspaceUsage(workspaceId: string) {
   return {
     plan,
     used,
-    limit: plan === "free" ? 5 : null,
+    limit: planTaskLimit(plan),
   };
 }
 
 export async function assertTaskQuota(workspaceId: string) {
   const usage = await getWorkspaceUsage(workspaceId);
-  if (usage.plan === "free" && usage.used >= 5) {
-    throw new TaskQuotaError();
+  if (usage.limit !== null && usage.used >= usage.limit) {
+    throw new TaskQuotaError(usage.plan, usage.limit);
   }
   return usage;
 }
@@ -62,10 +85,10 @@ export function quotaErrorResponse(error: unknown) {
     error instanceof TaskQuotaError ||
     (error instanceof Error && error.name === "TASK_QUOTA_EXCEEDED")
   ) {
-    return NextResponse.json(
-      { error: "Free plan includes 5 tasks per month." },
-      { status: 402 },
-    );
+    // The message travels with the error so it reflects the plan's limit.
+    const message =
+      error instanceof Error ? error.message : "Task quota exceeded.";
+    return NextResponse.json({ error: message }, { status: 402 });
   }
   return null;
 }
