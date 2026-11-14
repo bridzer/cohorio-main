@@ -46,6 +46,7 @@ type ThreadDetail = {
 type LiveTurn = { prompt: string; steps: StepOutline[]; active: string | null };
 
 const SUGGESTIONS = [
+  "Run a full auto audit of my store and rank every fix by impact.",
   "Audit my weakest Shopify product pages and tell me what to fix first.",
   "Draft a Meta campaign for my best-selling product.",
   "Write a week of LinkedIn posts from our positioning and save them as drafts.",

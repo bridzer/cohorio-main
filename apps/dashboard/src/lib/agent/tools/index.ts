@@ -1,4 +1,5 @@
 import type { AgentTool } from "../types";
+import { storeAuditBrief } from "./audit";
 import {
   attachToLaunch,
   createLaunchRecord,
@@ -29,6 +30,7 @@ export const AGENT_TOOLS: AgentTool[] = [
   shopifyOverview,
   shopifyProducts,
   ga4Sessions,
+  storeAuditBrief,
   listRevopsLeads,
   saveSocialPosts,
   draftLifecycleEmails,

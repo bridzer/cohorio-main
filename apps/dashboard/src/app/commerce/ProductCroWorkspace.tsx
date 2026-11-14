@@ -11,6 +11,14 @@ type Recommendation = {
   pointsAvailable: number;
 };
 
+type SuggestedFixes = {
+  seoTitle: string | null;
+  seoDescription: string | null;
+  title: string | null;
+  descriptionStarter: string | null;
+  tags: string[];
+};
+
 type ProductAnalysis = {
   id: string;
   title: string;
@@ -33,6 +41,7 @@ type ProductAnalysis = {
   unitsSold30d: number;
   croScore: number;
   croRecommendations: Recommendation[];
+  suggestedFixes: SuggestedFixes | null;
 };
 
 type ProductSummary = {
@@ -101,6 +110,12 @@ export default function ProductCroWorkspace({
   const [implementation, setImplementation] = useState<{
     recommendation: Recommendation;
     product: ProductAnalysis;
+    /** Field -> Cohorio suggestion that pre-filled it. Editing a field clears its badge. */
+    suggested: Partial<Record<"title" | "descriptionText" | "seoTitle" | "seoDescription" | "tags", string>>;
+    /** Draft values at open time; a badge shows while the draft still matches. */
+    pristine: ProductDraft;
+    /** Starter copy offered for appending when the description was not pre-filled. */
+    starter: string | null;
   } | null>(null);
   const [draft, setDraft] = useState<ProductDraft | null>(null);
   const [saving, setSaving] = useState(false);
@@ -214,6 +229,16 @@ export default function ProductCroWorkspace({
     return `https://admin.shopify.com/store/${storeHandle}/products/${numericId}`;
   }
 
+  function areaHasSuggestion(area: string, product: ProductAnalysis) {
+    const fixes = product.suggestedFixes;
+    if (!fixes) return false;
+    if (area === "SEO") return Boolean(fixes.seoTitle || fixes.seoDescription);
+    if (area === "Headline") return Boolean(fixes.title);
+    if (area === "Value proposition") return Boolean(fixes.descriptionStarter);
+    if (area === "Merchandising") return fixes.tags.length > 0;
+    return false;
+  }
+
   function startImplementation(
     recommendation: Recommendation,
     product: ProductAnalysis,
@@ -223,22 +248,96 @@ export default function ProductCroWorkspace({
       if (adminUrl) window.open(adminUrl, "_blank", "noopener,noreferrer");
       return;
     }
-    setImplementation({ recommendation, product });
-    setDraft({
-      title: product.title,
-      descriptionText: product.descriptionText,
+    const fixes = product.suggestedFixes;
+    // Pre-fill empty or weak fields with Cohorio's suggestion so the merchant
+    // reviews and adopts instead of writing from scratch. Nothing is applied
+    // to Shopify until they press "Apply to Shopify".
+    const suggested: NonNullable<typeof implementation>["suggested"] = {};
+    const seoTitle = product.seoTitle || fixes?.seoTitle || "";
+    if (!product.seoTitle && fixes?.seoTitle) suggested.seoTitle = fixes.seoTitle;
+    const seoDescription = product.seoDescription || fixes?.seoDescription || "";
+    if (!product.seoDescription && fixes?.seoDescription) {
+      suggested.seoDescription = fixes.seoDescription;
+    }
+    const title = fixes?.title ?? product.title;
+    if (fixes?.title) suggested.title = fixes.title;
+    const descriptionEmpty = !product.descriptionText.trim();
+    const descriptionText =
+      descriptionEmpty && fixes?.descriptionStarter
+        ? fixes.descriptionStarter
+        : product.descriptionText;
+    if (descriptionEmpty && fixes?.descriptionStarter) {
+      suggested.descriptionText = fixes.descriptionStarter;
+    }
+    const tags = [...product.tags, ...(fixes?.tags ?? [])].join(", ");
+    if (fixes?.tags?.length) suggested.tags = fixes.tags.join(", ");
+    const draft: ProductDraft = {
+      title,
+      descriptionText,
       vendor: product.vendor ?? "",
       productType: product.productType ?? "",
-      tags: product.tags.join(", "),
-      seoTitle: product.seoTitle ?? "",
-      seoDescription: product.seoDescription ?? "",
+      tags,
+      seoTitle,
+      seoDescription,
       status:
         product.status === "DRAFT" || product.status === "ARCHIVED"
           ? product.status
           : "ACTIVE",
+    };
+    setImplementation({
+      recommendation,
+      product,
+      suggested,
+      pristine: { ...draft },
+      starter:
+        !descriptionEmpty && fixes?.descriptionStarter
+          ? fixes.descriptionStarter
+          : null,
     });
+    setDraft(draft);
     setImplementationError("");
     setReauthorizationRequired(false);
+  }
+
+  function resetField(
+    field: "title" | "descriptionText" | "seoTitle" | "seoDescription" | "tags",
+  ) {
+    if (!implementation || !draft) return;
+    const product = implementation.product;
+    const current: Record<typeof field, string> = {
+      title: product.title,
+      descriptionText: product.descriptionText,
+      seoTitle: product.seoTitle ?? "",
+      seoDescription: product.seoDescription ?? "",
+      tags: product.tags.join(", "),
+    };
+    setDraft({ ...draft, [field]: current[field] });
+  }
+
+  function appendStarter() {
+    if (!implementation?.starter || !draft) return;
+    setDraft({
+      ...draft,
+      descriptionText: draft.descriptionText.trim()
+        ? `${draft.descriptionText.trim()}\n\n${implementation.starter}`
+        : implementation.starter,
+    });
+    setImplementation({ ...implementation, starter: null });
+  }
+
+  function suggestionBadge(field: "title" | "descriptionText" | "seoTitle" | "seoDescription" | "tags") {
+    if (!implementation || !draft) return null;
+    if (implementation.suggested[field] === undefined) return null;
+    if (draft[field] !== implementation.pristine[field]) return null;
+    return (
+      <small className="commerce-cro-suggested">
+        Suggested by Cohorio — edit freely or{" "}
+        <button type="button" onClick={() => resetField(field)}>
+          reset to current
+        </button>
+        .
+      </small>
+    );
   }
 
   async function applyImplementation() {
@@ -523,6 +622,11 @@ export default function ProductCroWorkspace({
                       </div>
                       <aside className="commerce-cro-rec-action">
                         <b>+{recommendation.pointsAvailable}</b>
+                        {areaHasSuggestion(recommendation.area, selectedProduct) && (
+                          <small className="commerce-cro-suggestion-ready">
+                            Cohorio suggestion ready
+                          </small>
+                        )}
                         <button
                           onClick={() =>
                             startImplementation(
@@ -600,6 +704,7 @@ export default function ProductCroWorkspace({
                     }
                   />
                   <small>{draft.title.length}/255 characters</small>
+                  {suggestionBadge("title")}
                 </label>
               )}
 
@@ -621,7 +726,17 @@ export default function ProductCroWorkspace({
                     objection handling. Saving replaces the current formatted
                     description with these paragraphs.
                   </small>
+                  {suggestionBadge("descriptionText")}
                 </label>
+              )}
+              {implementation.starter && (
+                <div className="commerce-cro-suggestion-box">
+                  <strong>Suggested opening from Cohorio</strong>
+                  <p>{implementation.starter}</p>
+                  <button type="button" onClick={appendStarter}>
+                    Append to description
+                  </button>
+                </div>
               )}
 
               {implementation.recommendation.area === "SEO" && (
@@ -636,6 +751,7 @@ export default function ProductCroWorkspace({
                       }
                     />
                     <small>{draft.seoTitle.length}/60 recommended</small>
+                    {suggestionBadge("seoTitle")}
                   </label>
                   <label>
                     SEO description
@@ -651,6 +767,7 @@ export default function ProductCroWorkspace({
                       }
                     />
                     <small>{draft.seoDescription.length}/160 recommended</small>
+                    {suggestionBadge("seoDescription")}
                   </label>
                 </>
               )}
@@ -692,6 +809,7 @@ export default function ProductCroWorkspace({
                       placeholder="summer, bestseller, lightweight"
                     />
                     <small>Separate tags with commas.</small>
+                    {suggestionBadge("tags")}
                   </label>
                 </>
               )}

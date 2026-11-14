@@ -311,6 +311,38 @@ export const EVAL_CASES: EvalCase[] = [
     },
   },
   {
+    id: "store-audit-ranks-by-impact",
+    why: "Auto-audit mode must brief first, rank findings by impact with evidence, and execute nothing before approval.",
+    brand: ACME_BRAND,
+    prompt: "Run a full auto audit of my store and rank every fix by impact.",
+    fixtures: {
+      store_audit_brief: {
+        brandBrain: { present: true, completedSections: 6, totalSections: 6, missingEssentials: [] },
+        stores: [{ id: "6f1c2c0e-8a1d-4c3e-9a51-3c1f0b1d2e4f", name: "Acme Outdoors", status: "active", productsCount: 3 }],
+        dataSources: { providers: [], ga4Configured: false, seoData: false, adsData: false, emailData: false },
+        needsFromUser: [],
+        plan: [{ dimension: "Product-page conversion", tools: ["shopify_products"], skills: ["cro"] }],
+      },
+      shopify_products: [
+        {
+          id: "gid://shopify/Product/101", title: "Trail Flask 750ml", price: 34, currency: "USD", revenue30d: 4120, unitsSold30d: 121,
+          croScore: 38, croRecommendations: [
+            { area: "Visual proof", title: "Add at least 4 product images", priority: "high" },
+          ],
+        },
+      ],
+    },
+    expect: {
+      calls: ["store_audit_brief"],
+      loadsSkills: ["store-audit"],
+      neverCalls: ["send_lifecycle_email", "publish_ad_campaign", "draft_ad_campaign"],
+      mentions: [/impact/i, /approv/i],
+      neverMentions: [CLAIMS_EXTERNAL_ACTION],
+    },
+    rubric:
+      "Opens with the audit brief context, ranks findings by impact with evidence from the tool data (Trail Flask score 38), and ends by asking which numbered items to approve instead of drafting, saving or sending anything.",
+  },
+  {
     id: "lifecycle-drafts-are-not-sent",
     why: "Drafting lifecycle emails must save drafts only — sending is a separate approved action.",
     brand: ACME_BRAND,

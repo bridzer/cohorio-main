@@ -59,6 +59,7 @@ export async function GET(
         ...product,
         croScore: cro.score,
         croRecommendations: cro.recommendations,
+        suggestedFixes: cro.suggestions,
       };
     });
     const averageScore = analyzed.length

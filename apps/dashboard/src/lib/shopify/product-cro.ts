@@ -37,12 +37,186 @@ export type ProductCroAnalysis = {
   score: number;
   grade: "strong" | "fair" | "needs-work";
   recommendations: ProductCroRecommendation[];
+  suggestions: ProductFixSuggestions;
+};
+
+/**
+ * Concrete ready-to-adopt values for the fixable fields, generated
+ * deterministically from product facts plus Brand Brain. Every suggestion is
+ * something the merchant can accept as-is or edit: nothing is invented
+ * (no prices, claims, or perks), and fields that cannot be derived honestly
+ * (vendor, imagery) get no suggestion. Null means "no suggestion needed".
+ */
+export type ProductFixSuggestions = {
+  seoTitle: string | null;
+  seoDescription: string | null;
+  /** A stronger product title, only when the current one is outside 20–70 chars. */
+  title: string | null;
+  /** A starter description, only when the current one is under 300 chars. */
+  descriptionStarter: string | null;
+  /** Tags to add (existing tags untouched), only when fewer than 3 are set. */
+  tags: string[];
 };
 
 function priority(pointsAvailable: number) {
   if (pointsAvailable >= 7) return "high";
   if (pointsAvailable >= 4) return "medium";
   return "low";
+}
+
+const SUGGESTION_STOPWORDS = new Set([
+  "the", "and", "for", "with", "from", "that", "this", "your", "you",
+  "our", "are", "was", "were", "has", "have", "will", "per", "new",
+  "all", "any", "each", "more", "most", "only", "very", "can",
+]);
+
+function trimToWordBoundary(text: string, maxLength: number) {
+  const trimmed = text.trim().replace(/\s+/g, " ");
+  if (trimmed.length <= maxLength) return trimmed;
+  const cut = trimmed.lastIndexOf(" ", maxLength);
+  return (cut > 0 ? trimmed.slice(0, cut) : trimmed.slice(0, maxLength)).trim();
+}
+
+function firstSentence(text: string) {
+  const match = text.trim().match(/^[^.!?]+[.!?]/);
+  return (match ? match[0] : text).trim().replace(/\s+/g, " ");
+}
+
+function ensurePeriod(sentence: string) {
+  const trimmed = sentence.trim();
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
+/** Distinctive lowercase keywords for tag and title building. */
+function contentWords(text: string, minLength = 4): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const token of text.toLowerCase().split(/[^a-z0-9]+/)) {
+    if (token.length < minLength || SUGGESTION_STOPWORDS.has(token) || seen.has(token)) {
+      continue;
+    }
+    seen.add(token);
+    result.push(token);
+  }
+  return result;
+}
+
+type BrandFacts = { oneLiner: string; whatItDoes: string; category: string };
+
+function brandFacts(brandContextMarkdown: string): BrandFacts {
+  return {
+    oneLiner: markdownFieldValue(brandContextMarkdown, "Product overview", "One-line description"),
+    whatItDoes: markdownFieldValue(brandContextMarkdown, "Product overview", "What it does"),
+    category: markdownFieldValue(brandContextMarkdown, "Product overview", "Product category"),
+  };
+}
+
+function suggestSeoTitle(product: ProductCroInput, brand: BrandFacts): string | null {
+  const current = product.seoTitle?.trim() ?? "";
+  if (current.length >= 30 && current.length <= 60) return null;
+  const title = product.title.trim();
+  if (!title) return null;
+  const qualifier = [product.vendor, product.productType].filter(Boolean).join(" ");
+  const detail = qualifier || brand.category;
+  if (detail) {
+    const fitted = trimToWordBoundary(`${title} – ${detail}`, 60);
+    if (fitted.length >= 30) return fitted;
+  }
+  const trimmed = trimToWordBoundary(title, 60);
+  return trimmed.length >= 30 ? trimmed : null;
+}
+
+function suggestSeoDescription(product: ProductCroInput, brand: BrandFacts): string | null {
+  const current = product.seoDescription?.trim() ?? "";
+  if (current.length >= 120 && current.length <= 160) return null;
+  const title = product.title.trim();
+  if (!title) return null;
+  const descriptionLead = firstSentence(product.descriptionText);
+  const lead =
+    descriptionLead.length >= 40
+      ? descriptionLead
+      : brand.oneLiner || `${title}${product.vendor ? ` by ${product.vendor}` : ""}.`;
+  const tails: string[] = [];
+  if (brand.oneLiner && lead !== brand.oneLiner) tails.push(ensurePeriod(brand.oneLiner));
+  if (brand.whatItDoes) {
+    const sentence = ensurePeriod(firstSentence(brand.whatItDoes));
+    if (!lead.includes(sentence.slice(0, 24)) && !tails.includes(sentence)) tails.push(sentence);
+  }
+  if (brand.category) tails.push(`Shop ${brand.category}.`);
+  tails.push("Shop now.");
+  let composed = lead;
+  for (const tail of tails) {
+    if (`${composed} ${tail}`.length <= 160) {
+      composed = `${composed} ${tail}`;
+    }
+  }
+  composed = trimToWordBoundary(composed, 160);
+  return composed.length >= 100 ? composed : null;
+}
+
+function suggestTitle(product: ProductCroInput, brand: BrandFacts): string | null {
+  const title = product.title.trim();
+  const titleLength = title.length;
+  if (!title || (titleLength >= 20 && titleLength <= 70)) return null;
+  if (titleLength > 70) return trimToWordBoundary(title, 70);
+  const qualifier = product.productType || brand.category || product.vendor;
+  if (!qualifier) return null;
+  return trimToWordBoundary(`${title} – ${qualifier}`, 70);
+}
+
+function suggestDescriptionStarter(product: ProductCroInput, brand: BrandFacts): string | null {
+  if (product.descriptionText.trim().length >= 300) return null;
+  const title = product.title.trim();
+  if (!title) return null;
+  const sentences: string[] = [];
+  if (brand.oneLiner) sentences.push(ensurePeriod(brand.oneLiner));
+  const existingLead = firstSentence(product.descriptionText);
+  if (existingLead && !sentences.includes(ensurePeriod(existingLead))) {
+    sentences.push(ensurePeriod(existingLead));
+  }
+  if (!existingLead && brand.whatItDoes) {
+    sentences.push(ensurePeriod(firstSentence(brand.whatItDoes)));
+  }
+  if (!sentences.length) {
+    const qualifier = [product.vendor, product.productType].filter(Boolean).join(" ");
+    sentences.push(`${title}${qualifier ? ` – ${qualifier}` : ""}.`);
+  }
+  return trimToWordBoundary(sentences.join(" "), 600);
+}
+
+function suggestTags(product: ProductCroInput, brand: BrandFacts): string[] {
+  if (product.tags.length >= 3) return [];
+  const existing = new Set(product.tags.map((tag) => tag.toLowerCase()));
+  const candidates = [
+    product.productType ?? "",
+    product.vendor ?? "",
+    ...brand.category.split(/[^A-Za-z0-9]+/),
+    ...contentWords(product.title),
+  ];
+  const picks: string[] = [];
+  for (const raw of candidates) {
+    const tag = raw.toLowerCase().trim();
+    if (!tag || tag.length < 2 || tag.length > 30 || /^\d+$/.test(tag)) continue;
+    if (existing.has(tag)) continue;
+    existing.add(tag);
+    picks.push(tag);
+    if (product.tags.length + picks.length >= 3) break;
+  }
+  return picks;
+}
+
+export function suggestProductFixes(
+  product: ProductCroInput,
+  brandContextMarkdown = "",
+): ProductFixSuggestions {
+  const brand = brandFacts(brandContextMarkdown);
+  return {
+    seoTitle: suggestSeoTitle(product, brand),
+    seoDescription: suggestSeoDescription(product, brand),
+    title: suggestTitle(product, brand),
+    descriptionStarter: suggestDescriptionStarter(product, brand),
+    tags: suggestTags(product, brand),
+  };
 }
 
 function sharesTwelveCharacterWindow(description: string, oneLiner: string) {
@@ -260,5 +434,6 @@ export function analyzeProductCro(
           ? "fair"
           : "needs-work",
     recommendations: rankedRecommendations,
+    suggestions: suggestProductFixes(product, brandContextMarkdown),
   };
 }

@@ -49,57 +49,25 @@ export type ToolModel = (input: {
   signal?: AbortSignal;
 }) => Promise<ModelTurn>;
 
-const MODEL_TIMEOUT_MS = 90_000;
-
 export type LlmProvider = "anthropic" | "meta-muse" | "openai-compatible";
 
 /**
  * COHORIO_LLM_PROVIDER picks the API: "anthropic", "meta-muse" (aliases
- * "meta", "muse", "meta-ai") or "openai-compatible". Unset, an Anthropic key
- * (sk-ant-) means Claude through the Anthropic SDK, a base URL at api.meta.ai
- * means Meta Muse, and anything else uses the OpenAI-compatible
- * chat-completions endpoint at COHORIO_LLM_BASE_URL (Groq, OpenRouter, ...).
+ * "meta", "muse", "meta-ai") or "openai-compatible" (alias "openai"). Unset,
+ * an Anthropic key (sk-ant-) means Claude through the Anthropic SDK, a base
+ * URL at api.meta.ai means Meta Muse, and anything else uses the
+ * OpenAI-compatible chat-completions endpoint (OpenAI, Groq, OpenRouter, ...).
  */
 export function llmProvider(): LlmProvider {
   const configured = process.env.COHORIO_LLM_PROVIDER?.trim().toLowerCase();
-  if (configured === "anthropic" || configured === "openai-compatible") return configured;
+  if (configured === "anthropic") return configured;
+  if (configured === "openai-compatible" || configured === "openai") return "openai-compatible";
   if (configured === "meta-muse" || configured === "meta" || configured === "muse" || configured === "meta-ai") {
     return "meta-muse";
   }
   if (process.env.COHORIO_LLM_API_KEY?.trim().startsWith("sk-ant-")) return "anthropic";
   if ((process.env.COHORIO_LLM_BASE_URL ?? "").includes("api.meta.ai")) return "meta-muse";
   return "openai-compatible";
-}
-
-/** Chat-completions messages carry only the standard fields. */
-function chatCompletionsMessages(messages: AgentMessage[]) {
-  return messages.map((message) => {
-    if (message.role === "assistant") {
-      const { providerContent: _raw, ...rest } = message;
-      void _raw;
-      return rest;
-    }
-    if (message.role === "tool") {
-      const { isError: _flag, ...rest } = message;
-      void _flag;
-      return rest;
-    }
-    return message;
-  });
-}
-
-function modelConfig() {
-  const apiKey = process.env.COHORIO_LLM_API_KEY?.trim();
-  if (!apiKey) {
-    throw new Error("COHORIO_LLM_API_KEY is not configured.");
-  }
-  const baseUrl = (
-    process.env.COHORIO_LLM_BASE_URL || "https://api.openai.com/v1"
-  )
-    .trim()
-    .replace(/\/$/, "");
-  const model = (process.env.COHORIO_LLM_MODEL || "gpt-4.1-mini").trim();
-  return { apiKey, baseUrl, model };
 }
 
 export const completeWithTools: ToolModel = async (input) => {
@@ -111,62 +79,8 @@ export const completeWithTools: ToolModel = async (input) => {
     const { museWithTools } = await import("./meta-muse");
     return museWithTools(input);
   }
-  const { apiKey, baseUrl, model } = modelConfig();
-  const timeout = AbortSignal.timeout(MODEL_TIMEOUT_MS);
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      messages: chatCompletionsMessages(input.messages),
-      tools: input.tools.length ? input.tools : undefined,
-      tool_choice: input.tools.length ? (input.toolChoice ?? "auto") : undefined,
-      temperature: 0.3,
-    }),
-    signal: input.signal ? AbortSignal.any([input.signal, timeout]) : timeout,
-  });
-  if (!response.ok) {
-    // Provider bodies can echo request details; keep them out of the error.
-    throw new Error(
-      `The language model request failed (HTTP ${response.status}).`,
-    );
-  }
-  const payload = (await response.json()) as {
-    choices?: {
-      message?: { content?: unknown; tool_calls?: unknown };
-    }[];
-    usage?: { prompt_tokens?: number; completion_tokens?: number };
-  };
-  const message = payload.choices?.[0]?.message;
-  if (!message) {
-    throw new Error("The language model returned an empty response.");
-  }
-  const toolCalls = Array.isArray(message.tool_calls)
-    ? (message.tool_calls as ToolCall[]).filter(
-        (call) =>
-          call?.type === "function" &&
-          typeof call.id === "string" &&
-          typeof call.function?.name === "string",
-      )
-    : [];
-  const content =
-    typeof message.content === "string" && message.content.trim()
-      ? message.content
-      : null;
-  if (!content && !toolCalls.length) {
-    throw new Error("The language model returned an empty response.");
-  }
-  return {
-    content,
-    toolCalls,
-    usage: {
-      promptTokens: payload.usage?.prompt_tokens ?? 0,
-      completionTokens: payload.usage?.completion_tokens ?? 0,
-    },
-  };
+  const { openaiWithTools } = await import("./openai");
+  return openaiWithTools(input);
 };
 
 export async function completeChat(messages: ChatMessage[]) {
@@ -178,45 +92,6 @@ export async function completeChat(messages: ChatMessage[]) {
     const { museChat } = await import("./meta-muse");
     return museChat(messages);
   }
-  const { apiKey, baseUrl, model } = modelConfig();
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.4,
-    }),
-  });
-  if (!response.ok) {
-    const detail = await response.text();
-    let providerMessage = "";
-    try {
-      const parsed = JSON.parse(detail) as {
-        error?: { message?: string } | string;
-      };
-      providerMessage =
-        typeof parsed.error === "string"
-          ? parsed.error
-          : (parsed.error?.message ?? "");
-    } catch {
-      providerMessage = detail.slice(0, 240);
-    }
-    throw new Error(
-      providerMessage
-        ? `The language model request failed: ${providerMessage}`
-        : "The language model request failed.",
-    );
-  }
-  const payload = (await response.json()) as {
-    choices?: { message?: { content?: unknown } }[];
-  };
-  const content = payload.choices?.[0]?.message?.content;
-  if (typeof content !== "string" || !content.trim()) {
-    throw new Error("The language model returned an empty response.");
-  }
-  return content;
+  const { openaiChat } = await import("./openai");
+  return openaiChat(messages);
 }

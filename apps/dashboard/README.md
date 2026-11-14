@@ -76,12 +76,17 @@ through `src/lib/llm/client.ts`, which supports three providers:
   `https://api.meta.ai` host (a `/v1` path is added) or an explicit
   `https://api.meta.ai/v1`. Aliases `meta`, `muse` and `meta-ai` select the
   same provider.
-- **`openai-compatible`** — any other chat-completions API (Groq, OpenRouter,
-  OpenAI) at `COHORIO_LLM_BASE_URL`.
+- **`openai-compatible`** — OpenAI (`src/lib/llm/openai.ts`) or any other
+  chat-completions API (Groq, OpenRouter, Ollama, vLLM) at
+  `COHORIO_LLM_BASE_URL`. Alias `openai` selects the same provider. Any model
+  id the endpoint serves works via `COHORIO_LLM_MODEL` (defaults to
+  `gpt-4.1-mini`); a pathless base URL gets a `/v1` path added. Price unknown
+  models with `COHORIO_LLM_PRICING_JSON` (see `src/lib/llm/pricing.ts`).
 
 Configure with:
 
-- `COHORIO_LLM_PROVIDER` — `anthropic`, `meta-muse` or `openai-compatible`.
+- `COHORIO_LLM_PROVIDER` — `anthropic`, `meta-muse` or `openai-compatible`
+  (alias `openai`).
   When unset, an Anthropic key (`sk-ant-…`) selects `anthropic` and an
   `api.meta.ai` base URL selects `meta-muse`.
 - `COHORIO_LLM_API_KEY` — server-only key for the chosen provider. Leave it
@@ -89,8 +94,9 @@ Configure with:
   `COHORIO_LLM_API_KEY is not configured.` and inserts nothing.
 - `COHORIO_LLM_MODEL` — model id. For `anthropic` it must be a Claude id
   (defaults to `claude-opus-5-5`); for `meta-muse` it must not be a Claude id
-  (defaults to `muse-wonder-1.0`); a mismatched id is rejected with a clear
-  error rather than sent.
+  (defaults to `muse-wonder-1.0`); for `openai-compatible` it can be any id
+  the endpoint serves (defaults to `gpt-4.1-mini`). A mismatched id is
+  rejected with a clear error rather than sent.
 - `COHORIO_LLM_EFFORT` — `anthropic` only: `low`, `medium` (default), `high`,
   `xhigh` or `max`. Higher effort thinks more and costs more.
 - `COHORIO_LLM_BASE_URL` — `meta-muse` and `openai-compatible` only, e.g.
@@ -345,8 +351,9 @@ playbooks and tools against fixture data (never a live database or provider),
 then score the answer with deterministic checks plus an LLM judge (4/5 to
 pass) where a case has a rubric. Cases cover grounding in each connector's
 reports (Meta Ads, Google Ads, Mailchimp, GA4), memory application and memory
-injection, approval gating for sends and publishes, and drafting without
-sending.
+injection, approval gating for sends and publishes, drafting without
+sending, and impact-ranked store auto audits that execute nothing before
+approval.
 
 They call the configured language model, so they are not part of `npm test`.
 Run them locally with `npm run eval` (reads `COHORIO_LLM_*` from `.env.local`;
@@ -377,6 +384,31 @@ cost and plan spend. Delegation is one level deep (a subagent cannot
 delegate), and drafts, approvals and the final answer always stay with the
 main agent. In the conversation the delegation appears as a single
 "Delegated a subtask" step with the findings as its result.
+
+## Store auto audit
+
+"Run a full auto audit of my store" (the first suggestion on `/agent`) puts
+the agent in auto-audit mode, following the `store-audit` playbook:
+
+1. **Brief** — `store_audit_brief` reports Brand Brain completeness (with the
+   exact missing essentials and suggested answers), connected Shopify stores,
+   connected SEO/ads/email data sources, and the per-dimension plan.
+2. **Intake** — when Brand Brain is missing or thin, the agent asks for the
+   missing essentials first (or proceeds store-only on labelled assumptions);
+   when no store is connected it asks for the storefront URL and points at
+   `/connections`. Connected stores are audited from synced product, revenue
+   and CRO data.
+3. **Evidence** — six dimensions (SEO and discoverability, product discovery,
+   product-page conversion, traffic and acquisition, lifecycle, offer and
+   trust), fanning heavy dimensions out to read-only `delegate_task`
+   subagents where worthwhile.
+4. **Ranked report** — every finding carries evidence, an impact (High/Medium/
+   Low) and an effort (S/M/L), sorted by impact, each naming the tool that
+   would execute the fix.
+5. **Approval, then execution** — the audit turn is reads-only and ends by
+   asking which numbered items to approve. Only approved items run: drafts
+   save inside Cohorio, sends/publishes/Brand Brain updates become proposals
+   in the approvals UI.
 
 Exposing Cohorio's tools to external agent clients over MCP is future work;
 it is intentionally not part of this step.

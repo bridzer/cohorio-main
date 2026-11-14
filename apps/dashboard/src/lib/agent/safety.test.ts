@@ -38,6 +38,7 @@ const SAMPLE_INPUT: Record<string, Record<string, unknown>> = {
   list_shopify_stores: {},
   shopify_overview: { connectionId: UUID },
   shopify_products: { connectionId: UUID },
+  store_audit_brief: {},
   ga4_sessions: {},
   list_leads: {},
   save_social_posts: { source: "idea", posts: [{ platform: "LinkedIn", body: "Post" }] },

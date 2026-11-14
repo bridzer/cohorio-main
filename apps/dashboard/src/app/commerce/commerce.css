@@ -2388,6 +2388,56 @@
   font-size: 7px;
 }
 
+.commerce-cro-suggestion-ready {
+  color: #47745a;
+  font-size: 7px;
+  font-weight: 700;
+}
+
+.commerce-cro-editor label small.commerce-cro-suggested {
+  color: #47745a;
+  font-weight: 650;
+}
+
+.commerce-cro-suggested button {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.commerce-cro-suggestion-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px dashed #b9cdc0;
+  border-radius: 8px;
+  background: #f4f8f5;
+  padding: 12px;
+  color: #3d4b44;
+  font-size: 8px;
+}
+
+.commerce-cro-suggestion-box p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.commerce-cro-suggestion-box button {
+  align-self: flex-start;
+  border: 1px solid #d7ded7;
+  border-radius: 6px;
+  background: #fff;
+  padding: 5px 10px;
+  color: #527c65;
+  font-size: 7px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
 .commerce-lifecycle-list header {
   align-items: center;
 }
