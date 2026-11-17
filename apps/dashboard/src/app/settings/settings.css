@@ -490,7 +490,8 @@
 
 .integration-connect,
 .integration-manage,
-.integration-google {
+.integration-google,
+.integration-meta {
   min-height: 38px;
   border-radius: 9px;
   padding: 0 14px;
@@ -507,7 +508,8 @@
 }
 
 .integration-manage,
-.integration-google {
+.integration-google,
+.integration-meta {
   border: 1px solid #d9dfd8;
   background: #fff;
   color: #365044;
@@ -515,7 +517,8 @@
 
 .integration-connect:disabled,
 .integration-manage:disabled,
-.integration-google:disabled {
+.integration-google:disabled,
+.integration-meta:disabled {
   opacity: 0.55;
   cursor: default;
 }

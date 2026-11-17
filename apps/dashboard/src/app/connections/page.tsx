@@ -43,6 +43,7 @@ export default function ConnectionsPage() {
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [ga4PropertyId, setGa4PropertyId] = useState("");
+  const [metaAccounts, setMetaAccounts] = useState<{ id: string; name: string }[]>([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState("");
@@ -111,6 +112,52 @@ export default function ConnectionsPage() {
     window.history.replaceState(null, "", "/connections");
   }, []);
 
+  // Meta Ads OAuth returns here with ?meta-ads=connected|choose|error&…
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const meta = params.get("meta-ads");
+    if (!meta) return;
+    if (meta === "connected") {
+      const account = params.get("account");
+      setNotice(
+        account
+          ? `Meta Ads connected with Facebook (${account}).`
+          : "Meta Ads connected with Facebook.",
+      );
+    } else if (meta === "choose") {
+      const account = params.get("account");
+      const count = params.get("accounts");
+      let options: { id: string; name: string }[] = [];
+      try {
+        const raw = (params.get("options") ?? "").replace(/-/g, "+").replace(/_/g, "/");
+        const padded = raw + "=".repeat((4 - (raw.length % 4)) % 4);
+        const bin = atob(padded);
+        const bytes = Uint8Array.from(bin, (char) => char.charCodeAt(0));
+        const parsed = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+        if (Array.isArray(parsed)) {
+          options = parsed
+            .filter(
+              (entry): entry is { id: string; name: string } =>
+                !!entry &&
+                typeof entry === "object" &&
+                typeof (entry as { id?: unknown }).id === "string" &&
+                typeof (entry as { name?: unknown }).name === "string",
+            )
+            .slice(0, 50);
+        }
+      } catch {
+        options = [];
+      }
+      setMetaAccounts(options);
+      setNotice(
+        `Meta Ads connected with Facebook${account ? ` (${account})` : ""}${count ? ` — ${count} ad accounts found` : ""}. Choose which ad account Cohorio should use.`,
+      );
+    } else {
+      setError(params.get("message") || "Unable to connect Meta Ads.");
+    }
+    window.history.replaceState(null, "", "/connections");
+  }, []);
+
   async function save(event: FormEvent<HTMLFormElement>, provider: string) {
     event.preventDefault();
     const apiKey = drafts[provider]?.trim() ?? "";
@@ -163,6 +210,53 @@ export default function ConnectionsPage() {
       window.location.assign(payload.url);
     } catch (connectError) {
       setError(connectError instanceof Error ? connectError.message : "Unable to start the GA4 connection.");
+      setBusy("");
+    }
+  }
+
+  async function connectMetaAds() {
+    setBusy("meta-ads");
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/integrations/meta-ads/oauth/start", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      const payload = (await response.json()) as { url?: string; error?: string };
+      if (!response.ok || !payload.url) {
+        throw new Error(payload.error || "Unable to start the Meta Ads connection.");
+      }
+      window.location.assign(payload.url);
+    } catch (connectError) {
+      setError(connectError instanceof Error ? connectError.message : "Unable to start the Meta Ads connection.");
+      setBusy("");
+    }
+  }
+
+  async function selectMetaAccount(accountId: string) {
+    setBusy("meta-ads-account");
+    setError("");
+    try {
+      const response = await fetch("/api/integrations/meta-ads/oauth/account", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId }),
+      });
+      const payload = (await response.json()) as {
+        account?: { id: string; name: string };
+        error?: string;
+      };
+      if (!response.ok || !payload.account) {
+        throw new Error(payload.error || "Unable to switch ad account.");
+      }
+      setMetaAccounts([]);
+      setNotice(`Meta Ads is now using ${payload.account.name}.`);
+      await load();
+    } catch (selectError) {
+      setError(selectError instanceof Error ? selectError.message : "Unable to switch ad account.");
+    } finally {
       setBusy("");
     }
   }
@@ -261,6 +355,27 @@ export default function ConnectionsPage() {
         </div>
         {error ? <p className="settings-error">{error}</p> : null}
         {notice ? <p className="settings-notice">{notice}</p> : null}
+        {metaAccounts.length > 0 ? (
+          <div className="integration-dialog" role="group" aria-label="Choose a Meta ad account">
+            <h2 id="meta-account-title">Choose an ad account</h2>
+            <p className="integration-blurb">
+              Your Facebook user can access {metaAccounts.length} ad accounts. Pick the one
+              Cohorio should read campaign results from.
+            </p>
+            <div className="integration-dialog-actions">
+              {metaAccounts.map((account) => (
+                <button
+                  key={account.id}
+                  type="button"
+                  disabled={busy === "meta-ads-account"}
+                  onClick={() => void selectMetaAccount(account.id)}
+                >
+                  {busy === "meta-ads-account" ? "Saving…" : account.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="integrations-toolbar">
           <input
@@ -456,6 +571,16 @@ export default function ConnectionsPage() {
                           Connect with Google (recommended)
                         </button>
                       </>
+                    ) : null}
+                    {selectedItem.provider === "meta-ads" ? (
+                      <button
+                        type="button"
+                        className="integration-meta"
+                        disabled={busy === "meta-ads"}
+                        onClick={() => void connectMetaAds()}
+                      >
+                        Connect with Facebook (recommended)
+                      </button>
                     ) : null}
                     <div className="integration-dialog-actions">
                       <button

@@ -129,7 +129,7 @@ export default function PrivacyPage() {
             <p className="mt-3">
               This policy covers personal data processed through the Cohorio dashboard at{" "}
               <strong>www.cohorio.site</strong>, including account data, workspace content, and data
-              from integrations you connect (Shopify, Google services, Stripe). It does not cover
+              from integrations you connect (Shopify, Google services, Meta Ads, Stripe). It does not cover
               third-party sites or services you visit through links, which have their own policies
               (see Section 9).
             </p>
@@ -159,6 +159,12 @@ export default function PrivacyPage() {
               <li>
                 <strong>Google services</strong> (sign-in, GA4, Google Ads): basic profile (name, email)
                 for sign-in, plus analytics or ads data you authorize. Details in Section 5.
+              </li>
+              <li>
+                <strong>Meta Ads</strong> (Facebook login, Marketing API): ad account metadata and
+                read-only campaign performance (spend, impressions, clicks, conversions) for the ad
+                account you select. Tokens are long-lived (~60 days); disconnecting deletes them and
+                stops syncing. Governed by Meta&apos;s Privacy Policy and Terms.
               </li>
               <li>
                 <strong>Stripe (billing):</strong> plan, subscription status, and Stripe customer /
@@ -345,6 +351,7 @@ export default function PrivacyPage() {
                   <tr><td className="border border-[#e0e4dd] p-2.5">Hosting &amp; database provider (e.g. Railway / PostgreSQL)</td><td className="border border-[#e0e4dd] p-2.5">Application hosting and primary data storage.</td></tr>
                   <tr><td className="border border-[#e0e4dd] p-2.5">Stripe, Inc.</td><td className="border border-[#e0e4dd] p-2.5">Subscription checkout, billing portal, and webhooks. Governed by Stripe&apos;s privacy policy and terms.</td></tr>
                   <tr><td className="border border-[#e0e4dd] p-2.5">Google (OAuth, GA4, Google Ads APIs)</td><td className="border border-[#e0e4dd] p-2.5">Sign-in and analytics/ads features you connect. Governed by Google&apos;s privacy policy and the API Services User Data Policy.</td></tr>
+                  <tr><td className="border border-[#e0e4dd] p-2.5">Meta (Facebook Login, Marketing API)</td><td className="border border-[#e0e4dd] p-2.5">Meta Ads &ldquo;Connect with Facebook&rdquo; and campaign reporting you connect. Governed by Meta&apos;s privacy policy and platform terms.</td></tr>
                   <tr><td className="border border-[#e0e4dd] p-2.5">AI model provider(s)</td><td className="border border-[#e0e4dd] p-2.5">Inference for agent and workspace features, as a processor.</td></tr>
                   <tr><td className="border border-[#e0e4dd] p-2.5">Email delivery (Resend / SMTP)</td><td className="border border-[#e0e4dd] p-2.5">Transactional email such as verification and password reset.</td></tr>
                   <tr><td className="border border-[#e0e4dd] p-2.5">Shopify (your own store)</td><td className="border border-[#e0e4dd] p-2.5">Reads store data you authorize; writes only on your explicit action.</td></tr>

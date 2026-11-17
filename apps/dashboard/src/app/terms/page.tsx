@@ -182,7 +182,8 @@ export default function TermsPage() {
             <p className="mt-3">
               Your use of connected services is also governed by their terms and policies,
               including Shopify&apos;s Terms of Service and API Terms, Google&apos;s Terms of
-              Service and API Services User Data Policy, and Stripe&apos;s services agreement.
+              Service and API Services User Data Policy, Meta&apos;s Terms of Service and
+              Advertising Policies, and Stripe&apos;s services agreement.
               Cohorio is not a party to those agreements and is not responsible for third-party
               acts, content, or downtime.
             </p>
