@@ -9,6 +9,8 @@ const PUBLIC_PATHS = [
   "/forgot-password",
   "/reset-password",
   "/invite",
+  "/privacy",
+  "/terms",
   "/auth/complete",
   "/api/auth",
   "/api/shopify/oauth/callback",

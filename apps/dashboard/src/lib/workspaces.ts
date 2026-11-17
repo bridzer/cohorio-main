@@ -11,6 +11,12 @@ export type WorkspaceJob = {
   label: string;
   detail: string;
   fields: WorkspaceField[];
+  /**
+   * When the run completes, the report hands over to /agent as a new
+   * conversation so the user continues the audit and its implementation in
+   * chat. Set on audit jobs (any audit the user runs opens that chat).
+   */
+  continuesInChat?: boolean;
 };
 
 export type WorkspaceDefinition = {
@@ -433,6 +439,7 @@ export const FEATURE_WORKSPACES: WorkspaceDefinition[] = [
         label: "Audit a site or page",
         detail: "Priority fixes for the URL you provide.",
         fields: [page("Site or page URL"), goal("Rank, index, or convert from search"), situation("Issues you already know")],
+        continuesInChat: true,
       },
       {
         id: "ai",

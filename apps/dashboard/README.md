@@ -125,6 +125,16 @@ The response should give three ads grounded in those facts without asking for
 the saved information, inventing proof, or adding a discount. With no saved
 context, it should identify the missing product information without inventing it.
 
+## Audit handoff to chat
+
+Workspace jobs flagged `continuesInChat` (currently the SEO audit) open a new
+agent conversation the moment the run completes. `/api/workspaces/run` returns
+a `handoff` prompt — the audit request plus the report, capped to fit the
+agent prompt limit — and the home page hands it to `/agent` through the
+pending-prompt sessionStorage key, so the user continues the audit and its
+implementation in chat. To hand off another audit the same way, set
+`continuesInChat: true` on its job in `src/lib/workspaces.ts`.
+
 ## Social scheduling
 
 Choose a date and time in Social Studio using the timezone shown beside the

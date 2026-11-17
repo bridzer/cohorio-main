@@ -3,6 +3,7 @@ import { workspaceContextMarkdown } from "@/lib/marketing-context-prompt";
 import { insertCopilotRun } from "@/lib/copilot-repository";
 import { completeChat } from "@/lib/llm/client";
 import { brandBrainMessages } from "@/lib/brand-brain-messages";
+import { buildAuditHandoffPrompt } from "@/lib/agent-ui/handoff";
 import { readSkillMarkdown } from "@/lib/skills/load-skill";
 import { findJob } from "@/lib/workspaces";
 import { skillForJob } from "@/lib/workspaces-server";
@@ -99,6 +100,25 @@ export async function POST(request: NextRequest) {
       output,
     });
     await recordTaskEvent(access.workspaceId, "copilot");
+    // Audit jobs continue in chat: the response carries the first message of
+    // a new agent conversation (request + report), which the client hands to
+    // /agent the moment the run completes.
+    const handoff = match.job.continuesInChat
+      ? buildAuditHandoffPrompt({
+          workspaceName: match.workspace.name,
+          jobLabel: match.job.label,
+          inputs: [
+            ...match.job.fields
+              .map((field) => ({
+                label: field.label,
+                value: answerText(answers[field.id]),
+              }))
+              .filter((item) => item.value),
+            ...(chat ? [{ label: "Additional details", value: chat }] : []),
+          ],
+          report: output,
+        })
+      : null;
     return NextResponse.json(
       {
         run: {
@@ -107,6 +127,7 @@ export async function POST(request: NextRequest) {
           output: run.output,
           created_at: run.created_at,
         },
+        handoff,
       },
       { status: 201 },
     );

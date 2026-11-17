@@ -445,14 +445,23 @@ export default function Home() {
       });
       const payload = (await response.json()) as {
         run?: CopilotRun;
+        handoff?: string | null;
         error?: string;
       };
       if (!response.ok || !payload.run) {
         throw new Error(payload.error || "Unable to run this workspace.");
       }
+      await refreshAssets();
+      if (payload.handoff) {
+        // Audit jobs continue in chat: open a new agent conversation seeded
+        // with the request and the report, so the user implements from there.
+        // No thread id travels along, so /agent starts a fresh conversation.
+        sessionStorage.setItem(PENDING_PROMPT_KEY, payload.handoff);
+        router.push("/agent");
+        return;
+      }
       setAssistantMessage(payload.run.output);
       setActiveOutput({ workspaceId: workspace.id, text: payload.run.output });
-      await refreshAssets();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to run this workspace.";

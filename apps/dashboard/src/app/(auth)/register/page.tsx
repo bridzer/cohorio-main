@@ -170,8 +170,15 @@ function RegisterForm() {
                   required
                 />
                 <span>
-                  I agree to the terms and consent to Cohorio processing my account
-                  data to provide the service.
+                  I agree to the{" "}
+                  <Link className="auth-link" href="/terms" target="_blank" rel="noreferrer">
+                    Terms &amp; Conditions
+                  </Link>{" "}
+                  and consent to Cohorio processing my account data per the{" "}
+                  <Link className="auth-link" href="/privacy" target="_blank" rel="noreferrer">
+                    Privacy Policy
+                  </Link>{" "}
+                  to provide the service.
                 </span>
               </label>
               {error && <AuthAlert variant="error">{error}</AuthAlert>}
