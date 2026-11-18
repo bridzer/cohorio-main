@@ -1,7 +1,28 @@
 import { emailTransport, escapeHtml, sendPlatformEmail } from "@/lib/email/transport";
 
 function authBaseUrl() {
-  return process.env.AUTH_URL ?? process.env.APP_URL ?? "http://localhost:3000";
+  const trim = (value: string | undefined) => value?.trim() || undefined;
+  const configured = trim(process.env.AUTH_URL) ?? trim(process.env.APP_URL);
+  const base = (configured ?? "http://localhost:3000").replace(/\/$/, "");
+  let hostname = "";
+  try {
+    hostname = new URL(base).hostname.toLowerCase();
+  } catch {
+    throw new Error("AUTH_URL/APP_URL is not a valid URL.");
+  }
+  const loopback =
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  // Railway/Vercel/Render set these; local `next start` smoke tests do not.
+  const onCloudHost =
+    Boolean(process.env.RAILWAY_ENVIRONMENT) ||
+    Boolean(process.env.VERCEL) ||
+    Boolean(process.env.RENDER);
+  if (process.env.NODE_ENV === "production" && loopback && (configured || onCloudHost)) {
+    throw new Error(
+      "AUTH_URL points at localhost in production. Set AUTH_URL (and APP_URL) to the public app URL, e.g. https://www.cohorio.site.",
+    );
+  }
+  return base;
 }
 
 export function authEmailConfigured() {
