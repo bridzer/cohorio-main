@@ -3,10 +3,8 @@ import {
   contextToMarkdown,
   type MarketingContext,
 } from "@/lib/marketing-context";
-import {
-  suggestCampaignField,
-  type CampaignProduct,
-} from "./campaign-suggestions";
+import { suggestCampaignField } from "./campaign-suggestions";
+import type { CampaignProduct } from "./ad-campaign";
 
 const context: MarketingContext = {
   productOverview: {
