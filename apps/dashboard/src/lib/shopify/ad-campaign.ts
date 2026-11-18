@@ -172,18 +172,35 @@ function creativeFor(
   };
 }
 
+export type CampaignAngle = CampaignCreative["angle"];
+
+export const CAMPAIGN_ANGLES: readonly CampaignAngle[] = [
+  "product",
+  "audience",
+  "offer",
+];
+
+export function isCampaignAngle(value: unknown): value is CampaignAngle {
+  return (
+    typeof value === "string" &&
+    (CAMPAIGN_ANGLES as readonly string[]).includes(value)
+  );
+}
+
 export function generateAdCampaign(
   brief: CampaignBrief,
   products: CampaignProduct[],
   brandContextMarkdown: string,
+  angles: CampaignAngle[] = [...CAMPAIGN_ANGLES],
 ): GeneratedCampaign {
+  const selectedAngles = angles.length ? angles : [...CAMPAIGN_ANGLES];
   const creatives = products.flatMap((product, productIndex) =>
-    (["product", "audience", "offer"] as const).map((angle, angleIndex) =>
+    selectedAngles.map((angle, angleIndex) =>
       creativeFor(
         product,
         brief,
         angle,
-        productIndex * 3 + angleIndex,
+        productIndex * selectedAngles.length + angleIndex,
         brandContextMarkdown,
       ),
     ),
@@ -196,6 +213,12 @@ export function generateAdCampaign(
     google: "Google Ads",
     tiktok: "TikTok",
   }[brief.platform];
+  const angleLabel =
+    selectedAngles.length === CAMPAIGN_ANGLES.length
+      ? "Three distinct creative angles"
+      : `${selectedAngles
+          .map((angle) => angle.charAt(0).toUpperCase() + angle.slice(1))
+          .join(" + ")} angle${selectedAngles.length === 1 ? "" : "s"}`;
 
   return {
     strategy: {
@@ -203,7 +226,7 @@ export function generateAdCampaign(
       structure: [
         `One ${brief.objective.toLowerCase()} campaign`,
         `${products.length} product-led ad group${products.length === 1 ? "" : "s"}`,
-        "Three distinct creative angles per product",
+        `${angleLabel} per product`,
         "Exclude recent purchasers where platform data allows",
       ],
       budgetPlan: {

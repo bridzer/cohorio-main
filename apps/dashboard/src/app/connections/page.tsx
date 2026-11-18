@@ -38,12 +38,36 @@ const FEATURED = [
 
 type SortMode = "recommended" | "name" | "connected";
 
+function decodeOptionParam(value: string | null) {
+  if (!value) return [];
+  try {
+    const raw = value.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = raw + "=".repeat((4 - (raw.length % 4)) % 4);
+    const bin = atob(padded);
+    const bytes = Uint8Array.from(bin, (char) => char.charCodeAt(0));
+    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (entry): entry is { id: string; name: string } =>
+          !!entry &&
+          typeof entry === "object" &&
+          typeof (entry as { id?: unknown }).id === "string" &&
+          typeof (entry as { name?: unknown }).name === "string",
+      )
+      .slice(0, 50);
+  } catch {
+    return [];
+  }
+}
+
 export default function ConnectionsPage() {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [ga4PropertyId, setGa4PropertyId] = useState("");
   const [metaAccounts, setMetaAccounts] = useState<{ id: string; name: string }[]>([]);
+  const [metaPages, setMetaPages] = useState<{ id: string; name: string }[]>([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState("");
@@ -112,45 +136,43 @@ export default function ConnectionsPage() {
     window.history.replaceState(null, "", "/connections");
   }, []);
 
-  // Meta Ads OAuth returns here with ?meta-ads=connected|choose|error&…
+  // Meta OAuth returns here with ?meta-ads=connected|choose|error&…
+  // "choose" can carry ad-account options, Page options, or both; the account
+  // picker goes first and the Page picker follows once the account is set.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const meta = params.get("meta-ads");
     if (!meta) return;
+    const page = params.get("page");
+    const pageSuffix = page ? ` Page: ${page}.` : "";
     if (meta === "connected") {
       const account = params.get("account");
       setNotice(
         account
-          ? `Meta Ads connected with Facebook (${account}).`
+          ? `Meta Ads connected with Facebook (${account}).${pageSuffix}`
           : "Meta Ads connected with Facebook.",
       );
     } else if (meta === "choose") {
       const account = params.get("account");
       const count = params.get("accounts");
-      let options: { id: string; name: string }[] = [];
-      try {
-        const raw = (params.get("options") ?? "").replace(/-/g, "+").replace(/_/g, "/");
-        const padded = raw + "=".repeat((4 - (raw.length % 4)) % 4);
-        const bin = atob(padded);
-        const bytes = Uint8Array.from(bin, (char) => char.charCodeAt(0));
-        const parsed = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
-        if (Array.isArray(parsed)) {
-          options = parsed
-            .filter(
-              (entry): entry is { id: string; name: string } =>
-                !!entry &&
-                typeof entry === "object" &&
-                typeof (entry as { id?: unknown }).id === "string" &&
-                typeof (entry as { name?: unknown }).name === "string",
-            )
-            .slice(0, 50);
-        }
-      } catch {
-        options = [];
-      }
-      setMetaAccounts(options);
+      const pageCount = params.get("pages");
+      const accountOptions = decodeOptionParam(params.get("options"));
+      setMetaAccounts(accountOptions);
+      const pageOptions = decodeOptionParam(params.get("pageOptions"));
+      setMetaPages(pageOptions);
+      const bits = [
+        account ? `(${account})` : null,
+        count ? `${count} ad accounts found` : null,
+        pageOptions.length ? `${pageCount ?? pageOptions.length} Pages found` : null,
+      ].filter(Boolean);
+      const target =
+        accountOptions.length && pageOptions.length
+          ? "ad account and Page"
+          : pageOptions.length
+            ? "Page"
+            : "ad account";
       setNotice(
-        `Meta Ads connected with Facebook${account ? ` (${account})` : ""}${count ? ` — ${count} ad accounts found` : ""}. Choose which ad account Cohorio should use.`,
+        `Meta Ads connected with Facebook${bits.length ? ` ${bits.join(" — ")}` : ""}. Choose which ${target} Cohorio should use.`,
       );
     } else {
       setError(params.get("message") || "Unable to connect Meta Ads.");
@@ -246,16 +268,53 @@ export default function ConnectionsPage() {
       });
       const payload = (await response.json()) as {
         account?: { id: string; name: string };
+        page?: { id: string; name: string } | null;
+        pages?: { id: string; name: string }[];
         error?: string;
       };
       if (!response.ok || !payload.account) {
         throw new Error(payload.error || "Unable to switch ad account.");
       }
       setMetaAccounts([]);
-      setNotice(`Meta Ads is now using ${payload.account.name}.`);
+      const pages = Array.isArray(payload.pages) ? payload.pages : [];
+      const pageSuffix = payload.page ? ` Page: ${payload.page.name}.` : "";
+      if (pages.length > 1) {
+        setMetaPages(pages);
+        setNotice(`Meta Ads is now using ${payload.account.name}.${pageSuffix} Choose which Page Cohorio should use.`);
+      } else {
+        setMetaPages([]);
+        setNotice(`Meta Ads is now using ${payload.account.name}.${pageSuffix}`);
+      }
       await load();
     } catch (selectError) {
       setError(selectError instanceof Error ? selectError.message : "Unable to switch ad account.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function selectMetaPage(pageId: string) {
+    setBusy("meta-ads-page");
+    setError("");
+    try {
+      const response = await fetch("/api/integrations/meta-ads/oauth/page", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pageId }),
+      });
+      const payload = (await response.json()) as {
+        page?: { id: string; name: string };
+        error?: string;
+      };
+      if (!response.ok || !payload.page) {
+        throw new Error(payload.error || "Unable to switch Page.");
+      }
+      setMetaPages([]);
+      setNotice(`Meta is now using the ${payload.page.name} Page.`);
+      await load();
+    } catch (selectError) {
+      setError(selectError instanceof Error ? selectError.message : "Unable to switch Page.");
     } finally {
       setBusy("");
     }
@@ -371,6 +430,27 @@ export default function ConnectionsPage() {
                   onClick={() => void selectMetaAccount(account.id)}
                 >
                   {busy === "meta-ads-account" ? "Saving…" : account.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {metaAccounts.length === 0 && metaPages.length > 0 ? (
+          <div className="integration-dialog" role="group" aria-label="Choose a Facebook Page">
+            <h2>Choose a Page</h2>
+            <p className="integration-blurb">
+              You manage {metaPages.length} Facebook Pages. Pick the one Cohorio
+              should read content and insights from.
+            </p>
+            <div className="integration-dialog-actions">
+              {metaPages.map((page) => (
+                <button
+                  key={page.id}
+                  type="button"
+                  disabled={busy === "meta-ads-page"}
+                  onClick={() => void selectMetaPage(page.id)}
+                >
+                  {busy === "meta-ads-page" ? "Saving…" : page.name}
                 </button>
               ))}
             </div>

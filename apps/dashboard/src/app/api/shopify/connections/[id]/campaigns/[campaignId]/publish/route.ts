@@ -33,11 +33,21 @@ export async function POST(
     if (!UUID.test(id) || !UUID.test(campaignId)) {
       return errorResponse("Campaign not found.", 404);
     }
-    const body = (await request.json()) as { confirm?: unknown };
+    const body = (await request.json()) as { confirm?: unknown; creativeIds?: unknown };
     if (body?.confirm !== true) {
       return errorResponse("Confirm the publish before Cohorio sends this campaign.", 400);
     }
-    const published = await publishWorkspaceCampaign(workspaceId, id, campaignId);
+    let creativeIds: string[] | undefined;
+    if (body?.creativeIds !== undefined) {
+      if (
+        !Array.isArray(body.creativeIds) ||
+        body.creativeIds.some((id) => typeof id !== "string")
+      ) {
+        return errorResponse("creativeIds must be an array of creative ids.", 400);
+      }
+      creativeIds = [...new Set(body.creativeIds)];
+    }
+    const published = await publishWorkspaceCampaign(workspaceId, id, campaignId, creativeIds);
     return NextResponse.json({ campaign: published });
   } catch (error) {
     const originResponse = originErrorResponse(error);
@@ -49,6 +59,9 @@ export async function POST(
     }
     if (error instanceof CampaignNotFoundError) {
       return errorResponse(error.message, 404);
+    }
+    if (error instanceof RangeError) {
+      return errorResponse(error.message, 400);
     }
     if (error instanceof PublishConfigError) {
       return errorResponse(error.message, 400);

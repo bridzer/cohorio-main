@@ -8,7 +8,12 @@ import {
   assertSameOrigin,
   originErrorResponse,
 } from "@/lib/auth/request";
-import { listMetaAdAccounts, serializeMetaCredential } from "@/lib/integrations/meta";
+import {
+  listMetaAdAccounts,
+  listMetaPages,
+  selectMetaPage,
+  serializeMetaCredential,
+} from "@/lib/integrations/meta";
 import { loadIntegration, saveIntegration } from "@/lib/integrations/store";
 import { requiredString } from "@/lib/integrations/connectors/types";
 
@@ -18,10 +23,22 @@ function errorResponse(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
 }
 
+async function storedAccessToken(workspaceId: string) {
+  const plaintext = await loadIntegration(workspaceId, "meta-ads");
+  if (!plaintext) return null;
+  try {
+    const parsed = JSON.parse(plaintext) as { accessToken?: unknown };
+    return requiredString(parsed.accessToken, "accessToken", "Meta Ads");
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Switches an OAuth-connected workspace to a different ad account without
  * reconnecting. The choice is verified against Meta: only accounts the stored
- * token can actually access are accepted.
+ * token can actually access are accepted. Pages ride along: a single Page
+ * re-attaches silently, several are returned for the picker.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -37,32 +54,40 @@ export async function POST(request: NextRequest) {
     if (!/^\d{1,20}$/.test(accountId)) {
       return errorResponse("Select a valid ad account.", 400);
     }
-    const plaintext = await loadIntegration(access.workspaceId, "meta-ads");
-    if (!plaintext) {
-      return errorResponse("Connect Meta Ads with Facebook first.", 400);
+    const accessToken = await storedAccessToken(access.workspaceId);
+    if (!accessToken) {
+      return errorResponse("Connect Meta with Facebook first.", 400);
     }
-    let accessToken: string;
-    try {
-      const parsed = JSON.parse(plaintext) as { accessToken?: unknown };
-      accessToken = requiredString(parsed.accessToken, "accessToken", "Meta Ads");
-    } catch {
-      return errorResponse("The saved Meta Ads credential is unreadable. Reconnect with Facebook.", 400);
-    }
-    const accounts = await listMetaAdAccounts(accessToken);
+    const [accounts, pages] = await Promise.all([
+      listMetaAdAccounts(accessToken),
+      listMetaPages(accessToken),
+    ]);
     const chosen = accounts.find((account) => account.id === accountId);
     if (!chosen) {
       return errorResponse("That ad account is not available to the connected Facebook user.", 400);
     }
-    await saveIntegration(access.workspaceId, "meta-ads", serializeMetaCredential(accessToken, chosen));
+    const page = selectMetaPage(pages) ?? pages[0] ?? null;
+    await saveIntegration(access.workspaceId, "meta-ads", serializeMetaCredential(accessToken, chosen, page));
     await auditAgentEvent({
       workspaceId: access.workspaceId,
       actorUserId: access.userId,
       eventType: "integration.connected",
       targetType: "integration",
       targetId: "meta-ads",
-      metadata: { verified: true, oauth: true, accountId: chosen.id, switched: true },
+      metadata: {
+        verified: true,
+        oauth: true,
+        accountId: chosen.id,
+        switched: true,
+        ...(page ? { pageId: page.id } : {}),
+      },
     });
-    return NextResponse.json({ provider: "meta-ads", account: { id: chosen.id, name: chosen.name } });
+    return NextResponse.json({
+      provider: "meta-ads",
+      account: { id: chosen.id, name: chosen.name },
+      page: page ? { id: page.id, name: page.name } : null,
+      pages: pages.map((entry) => ({ id: entry.id, name: entry.name })),
+    });
   } catch (error) {
     const originResponse = originErrorResponse(error);
     if (originResponse) return originResponse;

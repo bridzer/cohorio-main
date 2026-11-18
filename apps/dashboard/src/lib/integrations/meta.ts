@@ -11,8 +11,8 @@ const LABEL = "Meta Ads";
 const GRAPH = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
 const DIALOG = `https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth`;
 
-/** Read-only scopes matching today's Meta Ads connector tools. */
-export const META_OAUTH_SCOPES = ["ads_read"];
+/** Read-only scopes matching today's Meta connector tools plus Page selection. */
+export const META_OAUTH_SCOPES = ["ads_read", "pages_show_list", "pages_read_engagement"];
 
 export function metaOAuthClient() {
   const appId = process.env.META_APP_ID?.trim();
@@ -147,7 +147,60 @@ export function selectMetaAccount(accounts: MetaAdAccount[]) {
   return accounts.length === 1 ? accounts[0] : null;
 }
 
-/** Serializes to the exact shape the meta-ads connector parses. */
-export function serializeMetaCredential(accessToken: string, account: MetaAdAccount) {
-  return JSON.stringify({ accessToken, accountId: `act_${account.id}` });
+export type MetaPage = {
+  id: string;
+  name: string;
+  category: string | null;
+};
+
+type PagesPayload = {
+  data?: { id?: string | number; name?: string; category?: string }[];
+};
+
+/** Facebook Pages the user manages with this token. */
+export async function listMetaPages(accessToken: string): Promise<MetaPage[]> {
+  let payload: PagesPayload;
+  try {
+    const url = `${GRAPH}/me/accounts?${new URLSearchParams({ fields: "id,name,category", limit: "100" })}`;
+    payload = await providerJson<PagesPayload>(
+      LABEL,
+      url,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+  } catch (error) {
+    if (error instanceof ProviderError) throw error;
+    throw new ProviderError(LABEL, null, "Meta did not respond. Try again shortly.");
+  }
+  return (payload.data ?? [])
+    .map((row) => ({
+      id: String(row.id ?? "").trim(),
+      name: typeof row.name === "string" && row.name.trim() ? row.name.trim() : "Unnamed Page",
+      category: typeof row.category === "string" ? row.category : null,
+    }))
+    .filter((row) => /^\d{1,30}$/.test(row.id));
+}
+
+/**
+ * Exactly one manageable Page attaches silently; zero or many need the
+ * caller to skip or offer a picker. Pure and unit-tested.
+ */
+export function selectMetaPage(pages: MetaPage[]) {
+  return pages.length === 1 ? pages[0] : null;
+}
+
+/**
+ * Serializes to the exact shape the meta-ads connector parses. The optional
+ * page rides along as extra data: the connector reads accessToken/accountId
+ * and ignores the rest, so pasted and OAuth credentials stay compatible.
+ */
+export function serializeMetaCredential(
+  accessToken: string,
+  account: MetaAdAccount,
+  page?: MetaPage | null,
+) {
+  return JSON.stringify({
+    accessToken,
+    accountId: `act_${account.id}`,
+    page: page ? { id: page.id, name: page.name } : null,
+  });
 }

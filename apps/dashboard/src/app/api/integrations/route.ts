@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { listProviderIds } from "@/lib/integrations/providers";
-import { listIntegrationStatus } from "@/lib/integrations/store";
+import { listIntegrationStatus, loadIntegration } from "@/lib/integrations/store";
+import { publishAccountLabel } from "@/lib/integrations/destination-label";
 import { connectorFor } from "@/lib/integrations/connectors";
 
 // Providers Cohorio checks against the live API before saving, outside the connector registry.
 const VERIFIED_ELSEWHERE = new Set(["resend"]);
+// Ad providers whose saved credential carries a displayable account identity.
+const LABELED_AD_PROVIDERS = new Set(["meta-ads", "google-ads", "tiktok-ads"]);
 import {
   accessErrorResponse,
   requireWorkspaceAccess,
@@ -24,6 +27,18 @@ export async function GET() {
     const workspaceId = (await requireWorkspaceAccess("viewer")).workspaceId;
     const providers = await listProviderIds();
     const statuses = await listIntegrationStatus(workspaceId, providers);
+    const accountLabels = new Map<string, string | null>();
+    await Promise.all(
+      statuses
+        .filter((status) => status.configured && LABELED_AD_PROVIDERS.has(status.provider))
+        .map(async (status) => {
+          const plaintext = await loadIntegration(workspaceId, status.provider);
+          accountLabels.set(
+            status.provider,
+            plaintext ? publishAccountLabel(status.provider, plaintext) : null,
+          );
+        }),
+    );
     return NextResponse.json({
       integrations: statuses.map((status) => {
         const connector = connectorFor(status.provider);
@@ -33,6 +48,7 @@ export async function GET() {
           keyHint: connector?.keyHint ?? null,
           agentTools: connector?.tools.map((tool) => tool.name) ?? [],
           verifies: Boolean(connector) || VERIFIED_ELSEWHERE.has(status.provider),
+          accountLabel: accountLabels.get(status.provider) ?? null,
         };
       }),
     });

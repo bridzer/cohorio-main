@@ -5,10 +5,12 @@ import {
   exchangeForLongLivedToken,
   exchangeMetaCode,
   listMetaAdAccounts,
+  listMetaPages,
   metaAuthorizeUrl,
   metaOAuthClient,
   metaRedirectUri,
   selectMetaAccount,
+  selectMetaPage,
   serializeMetaCredential,
 } from "./meta";
 import { connector as metaAds } from "./connectors/meta-ads";
@@ -118,5 +120,39 @@ describe("meta ad accounts", () => {
   it("serializes to the shape the meta-ads connector parses", () => {
     const credential = serializeMetaCredential("tok", { id: "123", name: "Main", currency: "USD" });
     expect(metaAds.parse(credential)).toEqual({ accessToken: "tok", accountId: "123" });
+  });
+});
+
+describe("meta pages", () => {
+  it("lists manageable Facebook Pages", async () => {
+    fetchMock.mockResolvedValue(
+      json({ data: [{ id: "111", name: "Shop", category: "Retail" }, { id: 222, name: "Side" }] }),
+    );
+    await expect(listMetaPages("token")).resolves.toEqual([
+      { id: "111", name: "Shop", category: "Retail" },
+      { id: "222", name: "Side", category: null },
+    ]);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/me/accounts");
+  });
+
+  it("attaches silently only when exactly one Page exists", () => {
+    const one = [{ id: "111", name: "Shop", category: null as string | null }];
+    expect(selectMetaPage(one)).toEqual(one[0]);
+    expect(selectMetaPage([])).toBeNull();
+    expect(selectMetaPage([...one, { id: "222", name: "Side", category: null }])).toBeNull();
+  });
+
+  it("carries the selected Page without breaking pasted credentials", () => {
+    const credential = serializeMetaCredential(
+      "tok",
+      { id: "123", name: "Main", currency: "USD" },
+      { id: "999", name: "Shop", category: null },
+    );
+    expect(metaAds.parse(credential)).toEqual({ accessToken: "tok", accountId: "123" });
+    expect(JSON.parse(credential).page).toEqual({ id: "999", name: "Shop" });
+  });
+
+  it("requests ad and Page scopes in the authorize URL", () => {
+    expect(META_OAUTH_SCOPES).toEqual(["ads_read", "pages_show_list", "pages_read_engagement"]);
   });
 });

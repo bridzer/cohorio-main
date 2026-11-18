@@ -41,3 +41,35 @@ describe("generateAdCampaign brand grounding", () => {
     }
   });
 });
+
+describe("generateAdCampaign angles", () => {
+  it("generates all three angles per product by default", () => {
+    const campaign = generateAdCampaign(brief, products, "");
+    expect(campaign.creatives.map((creative) => creative.angle)).toEqual([
+      "product",
+      "audience",
+      "offer",
+    ]);
+    expect(campaign.strategy.structure).toContain(
+      "Three distinct creative angles per product",
+    );
+  });
+
+  it("generates only the requested angles with unique ids", () => {
+    const campaign = generateAdCampaign(brief, products, "", ["offer"]);
+    expect(campaign.creatives).toHaveLength(1);
+    expect(campaign.creatives[0]?.angle).toBe("offer");
+    expect(campaign.strategy.structure).toContain("Offer angle per product");
+  });
+
+  it("numbers creative ids across products without collisions", () => {
+    const two = [
+      ...products,
+      { ...products[0]!, id: "gid://shopify/Product/2", title: "Steel bottle" },
+    ];
+    const campaign = generateAdCampaign(brief, two, "", ["product", "offer"]);
+    expect(campaign.creatives).toHaveLength(4);
+    const ids = campaign.creatives.map((creative) => creative.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});

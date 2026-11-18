@@ -23,6 +23,7 @@ type CampaignRow = {
   selected_product_ids: string[];
   strategy: CampaignStrategy;
   creatives: CampaignCreative[];
+  published_creative_ids: string[];
   created_at: Date;
   updated_at: Date;
 };
@@ -54,6 +55,7 @@ function publicCampaign(row: CampaignRow) {
     selectedProductIds: row.selected_product_ids,
     strategy: row.strategy,
     creatives: row.creatives,
+    publishedCreativeIds: row.published_creative_ids ?? [],
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -223,11 +225,19 @@ export async function markAdCampaignPublished(
   workspaceId: string,
   campaignId: string,
   publishedReference: string,
+  publishedCreativeIds: string[],
 ) {
   const result = await query<CampaignRow>(
     `UPDATE shopify_ad_campaigns campaign
         SET status = 'ready',
             published_reference = NULLIF($4, ''),
+            published_creative_ids = (
+              SELECT ARRAY(
+                SELECT DISTINCT unnest(
+                  COALESCE(campaign.published_creative_ids, '{}') || $5::text[]
+                )
+              )
+            ),
             updated_at = NOW()
       FROM shopify_connections connection
       WHERE campaign.id = $1
@@ -235,7 +245,7 @@ export async function markAdCampaignPublished(
         AND connection.id = campaign.connection_id
         AND connection.workspace_id = $3
       RETURNING campaign.*`,
-    [campaignId, connectionId, workspaceId, publishedReference],
+    [campaignId, connectionId, workspaceId, publishedReference, publishedCreativeIds],
   );
   return result.rows[0] ? publicCampaign(result.rows[0]) : null;
 }

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   generateAdCampaign,
+  isCampaignAngle,
   type AdPlatform,
+  type CampaignAngle,
   type CampaignBrief,
 } from "@/lib/shopify/ad-campaign";
 import {
@@ -118,6 +120,18 @@ export async function POST(
       throw new RangeError("Choose between 1 and 10 Shopify products.");
     }
     const productIds = [...new Set(body.productIds.map(String))];
+    let angles: CampaignAngle[] | undefined;
+    if (body.angles !== undefined) {
+      if (
+        !Array.isArray(body.angles) ||
+        body.angles.length < 1 ||
+        body.angles.length > 3 ||
+        body.angles.some((angle) => !isCampaignAngle(angle))
+      ) {
+        throw new RangeError("Choose one to three creative angles.");
+      }
+      angles = [...new Set(body.angles)] as CampaignAngle[];
+    }
     const products = await getCampaignProducts(id, workspaceId, productIds);
     if (products.length !== productIds.length) {
       return NextResponse.json(
@@ -164,6 +178,7 @@ export async function POST(
       brief,
       products,
       await workspaceContextMarkdown(workspaceId),
+      angles,
     );
     const campaign = await createAdCampaign({
       connectionId: id,

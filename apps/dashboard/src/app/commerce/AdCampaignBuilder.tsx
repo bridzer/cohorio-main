@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import "./campaign.css";
+import CampaignFieldSuggest from "./CampaignFieldSuggest";
 
 type Platform = "meta" | "google" | "tiktok";
 
@@ -60,6 +61,7 @@ type Campaign = {
     launchChecklist: string[];
   };
   creatives: Creative[];
+  publishedCreativeIds: string[];
   createdAt: string;
   updatedAt: string;
 };
@@ -117,23 +119,42 @@ export default function AdCampaignBuilder({
   const [connectedProviders, setConnectedProviders] = useState<Set<string>>(
     () => new Set(),
   );
+  const [destinationLabels, setDestinationLabels] = useState<Record<string, string>>({});
   const [publishingId, setPublishingId] = useState("");
   const [publishNotice, setPublishNotice] = useState("");
+  const [checkedCreativeIds, setCheckedCreativeIds] = useState<string[]>([]);
+  const [selectedAngles, setSelectedAngles] = useState<
+    ("product" | "audience" | "offer")[]
+  >(["product", "audience", "offer"]);
 
   useEffect(() => {
     let cancelled = false;
     fetch("/api/integrations", { cache: "no-store" })
       .then((response) => response.json())
-      .then((payload: { integrations?: { provider: string; configured: boolean }[] }) => {
-        if (cancelled) return;
-        setConnectedProviders(
-          new Set(
-            (payload.integrations ?? [])
-              .filter((item) => item.configured)
-              .map((item) => item.provider),
-          ),
-        );
-      })
+      .then(
+        (payload: {
+          integrations?: {
+            provider: string;
+            configured: boolean;
+            accountLabel?: string | null;
+          }[];
+        }) => {
+          if (cancelled) return;
+          const items = payload.integrations ?? [];
+          setConnectedProviders(
+            new Set(
+              items.filter((item) => item.configured).map((item) => item.provider),
+            ),
+          );
+          setDestinationLabels(
+            Object.fromEntries(
+              items
+                .filter((item) => item.configured && item.accountLabel)
+                .map((item) => [item.provider, item.accountLabel as string]),
+            ),
+          );
+        },
+      )
       .catch(() => {
         // Publish stays disabled until connection status loads.
       });
@@ -175,6 +196,11 @@ export default function AdCampaignBuilder({
           setProducts(productPayload.products);
           setCampaigns(campaignPayload.campaigns);
           setSelectedCampaignId(campaignPayload.campaigns[0]?.id ?? "");
+          setCheckedCreativeIds(
+            campaignPayload.campaigns[0]?.creatives.map(
+              (creative) => creative.id,
+            ) ?? [],
+          );
           setSelectedProductIds(
             productPayload.products[0]?.id
               ? [productPayload.products[0].id]
@@ -218,6 +244,37 @@ export default function AdCampaignBuilder({
     );
   }
 
+  function toggleCreative(creativeId: string) {
+    setCheckedCreativeIds((current) =>
+      current.includes(creativeId)
+        ? current.filter((id) => id !== creativeId)
+        : [...current, creativeId],
+    );
+  }
+
+  function selectAllCreatives() {
+    if (!selectedCampaign) return;
+    setCheckedCreativeIds(
+      selectedCampaign.creatives.map((creative) => creative.id),
+    );
+  }
+
+  function clearCreatives() {
+    setCheckedCreativeIds([]);
+  }
+
+  function toggleAngle(angle: "product" | "audience" | "offer") {
+    setSelectedAngles((current) =>
+      current.includes(angle)
+        ? current.length > 1
+          ? current.filter((item) => item !== angle)
+          : current
+        : [...current, angle],
+    );
+  }
+
+  const draftTotal = selectedProductIds.length * selectedAngles.length;
+
   async function buildCampaign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!connectionId) return;
@@ -239,6 +296,7 @@ export default function AdCampaignBuilder({
             offer,
             landingPageUrl,
             productIds: selectedProductIds,
+            angles: selectedAngles,
           }),
         },
       );
@@ -251,6 +309,9 @@ export default function AdCampaignBuilder({
       }
       setCampaigns((current) => [payload.campaign!, ...current]);
       setSelectedCampaignId(payload.campaign.id);
+      setCheckedCreativeIds(
+        payload.campaign.creatives.map((creative) => creative.id),
+      );
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : "Unable to generate campaign.",
@@ -286,6 +347,7 @@ export default function AdCampaignBuilder({
         current.filter((item) => item.id !== campaign.id),
       );
       setSelectedCampaignId("");
+      setCheckedCreativeIds([]);
       return;
     }
     setCampaigns((current) =>
@@ -297,13 +359,24 @@ export default function AdCampaignBuilder({
 
   async function publish(campaign: Campaign) {
     if (!connectionId) return;
+    const toSend = campaign.creatives.filter((creative) =>
+      checkedCreativeIds.includes(creative.id),
+    );
+    if (!toSend.length) {
+      setError("Select at least one creative to publish.");
+      return;
+    }
+    const republished = toSend.filter((creative) =>
+      campaign.publishedCreativeIds.includes(creative.id),
+    );
     if (
       !window.confirm(
-        `Send "${campaign.name}" to ${platformName(campaign.platform)} now? Review the creatives first.`,
+        `Send ${toSend.length} of ${campaign.creatives.length} creatives from "${campaign.name}" to ${platformName(campaign.platform)} now?${republished.length ? ` ${republished.length} ${republished.length === 1 ? "was" : "were"} already published and will be sent again.` : ""} Review the creatives first.`,
       )
     ) {
       return;
     }
+    const sentIds = toSend.map((creative) => creative.id);
     setPublishingId(campaign.id);
     setPublishNotice("");
     setError("");
@@ -314,7 +387,7 @@ export default function AdCampaignBuilder({
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ confirm: true }),
+          body: JSON.stringify({ confirm: true, creativeIds: sentIds }),
         },
       );
       const payload = (await response.json()) as {
@@ -327,7 +400,12 @@ export default function AdCampaignBuilder({
       setCampaigns((current) =>
         current.map((item) => (item.id === campaign.id ? payload.campaign! : item)),
       );
-      setPublishNotice(`Sent to ${platformName(campaign.platform)}.`);
+      setCheckedCreativeIds((current) =>
+        current.filter((id) => !sentIds.includes(id)),
+      );
+      setPublishNotice(
+        `Sent ${sentIds.length} creative${sentIds.length === 1 ? "" : "s"} to ${platformName(campaign.platform)}.`,
+      );
     } catch (publishError) {
       setError(
         publishError instanceof Error
@@ -411,16 +489,30 @@ export default function AdCampaignBuilder({
             Cohorio never invents claims beyond your Shopify catalog and brief.
           </p>
         </div>
-        <div className="commerce-campaign-platforms" aria-label="Ad platform">
-          {(["meta", "google", "tiktok"] as Platform[]).map((item) => (
-            <button
-              key={item}
-              className={platform === item ? "active" : ""}
-              onClick={() => setPlatform(item)}
-            >
-              {platformName(item)}
-            </button>
-          ))}
+        <div className="commerce-runon" role="group" aria-label="Run campaign on">
+          {(["meta", "google", "tiktok"] as Platform[]).map((item) => {
+            const provider = PUBLISH_PROVIDERS[item];
+            const connected = connectedProviders.has(provider);
+            const account = destinationLabels[provider];
+            return (
+              <button
+                key={item}
+                type="button"
+                className={platform === item ? "active" : ""}
+                aria-pressed={platform === item}
+                onClick={() => setPlatform(item)}
+                title={
+                  connected
+                    ? `Publish through ${account ?? platformName(item)}`
+                    : `${platformName(item)} is not connected — drafts still work, publishing stays disabled`
+                }
+              >
+                <i className={connected ? "on" : ""} aria-hidden="true" />
+                <strong>{platformName(item)}</strong>
+                <small>{connected ? (account ?? "Connected") : "Not connected"}</small>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -450,6 +542,14 @@ export default function AdCampaignBuilder({
               placeholder="Fall collection prospecting"
               required
             />
+            <CampaignFieldSuggest
+              field="name"
+              connectionId={connectionId}
+              platform={platform}
+              objective={objective}
+              selectedProductIds={selectedProductIds}
+              onApply={setName}
+            />
           </label>
 
           <div className="commerce-campaign-field-grid">
@@ -463,6 +563,14 @@ export default function AdCampaignBuilder({
                 <option>Traffic</option>
                 <option>Awareness</option>
               </select>
+              <CampaignFieldSuggest
+                field="objective"
+                connectionId={connectionId}
+                platform={platform}
+                objective={objective}
+                selectedProductIds={selectedProductIds}
+                onApply={setObjective}
+              />
             </label>
             <label>
               Daily budget ({currencyCode})
@@ -487,6 +595,14 @@ export default function AdCampaignBuilder({
               placeholder="Who should see this, and what do they care about?"
               required
             />
+            <CampaignFieldSuggest
+              field="audience"
+              connectionId={connectionId}
+              platform={platform}
+              objective={objective}
+              selectedProductIds={selectedProductIds}
+              onApply={setAudience}
+            />
           </label>
 
           <label>
@@ -498,6 +614,14 @@ export default function AdCampaignBuilder({
               onChange={(event) => setValueProposition(event.target.value)}
               placeholder="The specific, supportable reason someone should buy"
               required
+            />
+            <CampaignFieldSuggest
+              field="valueProposition"
+              connectionId={connectionId}
+              platform={platform}
+              objective={objective}
+              selectedProductIds={selectedProductIds}
+              onApply={setValueProposition}
             />
           </label>
 
@@ -519,6 +643,14 @@ export default function AdCampaignBuilder({
               maxLength={2000}
               onChange={(event) => setLandingPageUrl(event.target.value)}
               placeholder="https://store.example.com/collections/fall"
+            />
+            <CampaignFieldSuggest
+              field="landingPageUrl"
+              connectionId={connectionId}
+              platform={platform}
+              objective={objective}
+              selectedProductIds={selectedProductIds}
+              onApply={setLandingPageUrl}
             />
           </label>
 
@@ -562,6 +694,34 @@ export default function AdCampaignBuilder({
             </div>
           </fieldset>
 
+          <fieldset>
+            <legend>
+              Creative angles{" "}
+              <small>
+                {selectedAngles.length}/3 · {draftTotal} draft
+                {draftTotal === 1 ? "" : "s"}
+              </small>
+            </legend>
+            <div className="commerce-angle-chips" role="group" aria-label="Creative angles">
+              {(
+                [
+                  ["product", "Product angle"],
+                  ["audience", "Audience angle"],
+                  ["offer", "Offer angle"],
+                ] as const
+              ).map(([angle, label]) => (
+                <button
+                  key={angle}
+                  type="button"
+                  aria-pressed={selectedAngles.includes(angle)}
+                  onClick={() => toggleAngle(angle)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+
           <button
             type="submit"
             disabled={
@@ -569,12 +729,13 @@ export default function AdCampaignBuilder({
               !name.trim() ||
               !audience.trim() ||
               !valueProposition.trim() ||
-              !selectedProductIds.length
+              !selectedProductIds.length ||
+              !selectedAngles.length
             }
           >
             {generating
               ? "Building campaign..."
-              : `Generate ${selectedProductIds.length * 3} creative drafts`}
+              : `Generate ${draftTotal} creative draft${draftTotal === 1 ? "" : "s"}`}
           </button>
           <p className="commerce-campaign-disclaimer">
             Drafts require human review, conversion tracking, and connected ad
@@ -595,7 +756,12 @@ export default function AdCampaignBuilder({
                   className={
                     selectedCampaign?.id === campaign.id ? "active" : ""
                   }
-                  onClick={() => setSelectedCampaignId(campaign.id)}
+                  onClick={() => {
+                    setSelectedCampaignId(campaign.id);
+                    setCheckedCreativeIds(
+                      campaign.creatives.map((creative) => creative.id),
+                    );
+                  }}
                 >
                   <span className={`platform-${campaign.platform}`}>
                     {platformName(campaign.platform).charAt(0)}
@@ -631,16 +797,19 @@ export default function AdCampaignBuilder({
                   <button
                     disabled={
                       publishingId === selectedCampaign.id ||
+                      !checkedCreativeIds.length ||
                       !connectedProviders.has(PUBLISH_PROVIDERS[selectedCampaign.platform])
                     }
                     title={
-                      connectedProviders.has(PUBLISH_PROVIDERS[selectedCampaign.platform])
-                        ? undefined
-                        : `Connect ${platformName(selectedCampaign.platform)} in Settings`
+                      !checkedCreativeIds.length
+                        ? "Select at least one creative below"
+                        : connectedProviders.has(PUBLISH_PROVIDERS[selectedCampaign.platform])
+                          ? undefined
+                          : `Connect ${platformName(selectedCampaign.platform)} in Settings`
                     }
                     onClick={() => void publish(selectedCampaign)}
                   >
-                    {publishingId === selectedCampaign.id ? "Publishing..." : "Publish"}
+                    {publishingId === selectedCampaign.id ? "Publishing..." : `Publish selected (${checkedCreativeIds.length})`}
                   </button>
                   <button
                     className="primary"
@@ -692,9 +861,37 @@ export default function AdCampaignBuilder({
                 </div>
               </div>
 
+              <div className="commerce-creatives-toolbar">
+                <span>
+                  {checkedCreativeIds.length} of {selectedCampaign.creatives.length} selected for publish
+                </span>
+                <span>
+                  <button type="button" onClick={selectAllCreatives}>
+                    Select all
+                  </button>
+                  <button type="button" onClick={clearCreatives}>
+                    Clear
+                  </button>
+                </span>
+              </div>
+
               <div className="commerce-campaign-creatives">
                 {selectedCampaign.creatives.map((creative) => (
                   <article key={creative.id}>
+                    <div className="commerce-creative-select">
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={checkedCreativeIds.includes(creative.id)}
+                          onChange={() => toggleCreative(creative.id)}
+                          aria-label={`Select creative: ${creative.headline}`}
+                        />
+                        Select
+                      </label>
+                      {selectedCampaign.publishedCreativeIds.includes(creative.id) ? (
+                        <span className="commerce-creative-published">Published</span>
+                      ) : null}
+                    </div>
                     <div className="commerce-creative-preview">
                       <i
                         style={
