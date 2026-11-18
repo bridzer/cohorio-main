@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { appBaseUrl } from "@/lib/app-url";
 
 const PUBLIC_PATHS = [
   "/sign-in",
@@ -33,7 +34,9 @@ export async function proxy(request: NextRequest) {
       { status: 401 },
     );
   }
-  const signIn = new URL("/sign-in", request.url);
+  // Canonical base, not request.url: the container has received lying
+  // Host headers (localhost:8080) while serving the public domain.
+  const signIn = new URL("/sign-in", appBaseUrl(request.url));
   signIn.searchParams.set(
     "callbackUrl",
     `${pathname}${request.nextUrl.search}`,
