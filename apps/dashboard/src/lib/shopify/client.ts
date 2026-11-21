@@ -93,6 +93,18 @@ export function shopifyConfig() {
   };
 }
 
+/** Path registered in the Shopify Dev Dashboard as an allowed redirection URL. */
+export const SHOPIFY_OAUTH_CALLBACK_PATH = "/api/shopify/oauth/callback";
+
+/**
+ * Exact redirect_uri sent in the OAuth authorize request. Must match the
+ * dashboard allowlist character-for-character (scheme, host, path, no
+ * trailing slash), so construction lives in exactly one place.
+ */
+export function shopifyRedirectUri(appUrl: string) {
+  return `${appUrl.replace(/\/$/, "")}${SHOPIFY_OAUTH_CALLBACK_PATH}`;
+}
+
 export function normalizeShopDomain(input: string) {
   let value = input.trim().toLowerCase();
   value = value.replace(/^https?:\/\//, "").replace(/\/.*$/, "");

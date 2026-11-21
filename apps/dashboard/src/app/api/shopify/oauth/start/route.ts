@@ -12,6 +12,7 @@ import {
   normalizeShopDomain,
   SHOPIFY_SCOPES,
   shopifyConfig,
+  shopifyRedirectUri,
 } from "@/lib/shopify/client";
 import { setOAuthState } from "@/lib/shopify/oauth-state";
 import { setWorkspaceCookie } from "@/lib/workspace";
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
     );
     const nonce = randomBytes(24).toString("base64url");
     const { clientId, appUrl } = shopifyConfig();
-    const redirectUri = `${appUrl}/api/shopify/oauth/callback`;
+    const redirectUri = shopifyRedirectUri(appUrl);
 
     const authorizeUrl = new URL(
       `https://${shopDomain}/admin/oauth/authorize`,
