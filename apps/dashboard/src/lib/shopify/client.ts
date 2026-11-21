@@ -556,6 +556,30 @@ const PRODUCTS_PAGE_QUERY = `#graphql
 
 const MAX_PRODUCT_PAGES = 20;
 
+const PRODUCT_STATUSES = ["ACTIVE", "DRAFT", "ARCHIVED"] as const;
+
+export type ShopifyProductStatus = (typeof PRODUCT_STATUSES)[number];
+
+/**
+ * Single normalization point for every product status written to
+ * shopify_products (whose CHECK constraint allows exactly these three).
+ * Trims and uppercases; anything else throws naming the offending value so a
+ * sync fails loudly with the value in the error instead of a bare Postgres
+ * constraint violation at write time. Never maps unknown statuses to ACTIVE.
+ */
+export function normalizeProductStatus(value: unknown, productTitle?: string): ShopifyProductStatus {
+  const normalized =
+    typeof value === "string" ? value.trim().toUpperCase() : "";
+  if ((PRODUCT_STATUSES as readonly string[]).includes(normalized)) {
+    return normalized as ShopifyProductStatus;
+  }
+  const seen = String(value ?? "").slice(0, 120) || "(missing)";
+  const label = productTitle ? ` for product ${JSON.stringify(productTitle)}` : "";
+  throw new RangeError(
+    `Unsupported Shopify product status ${JSON.stringify(seen)}${label}. Expected one of ACTIVE, DRAFT, ARCHIVED.`,
+  );
+}
+
 function numberFromShopify(value: string) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -623,7 +647,7 @@ export async function fetchShopifyOverview(
           seoTitle: product.seo.title,
           seoDescription: product.seo.description,
           onlineStoreUrl: product.onlineStoreUrl,
-          status: product.status.toUpperCase(),
+          status: normalizeProductStatus(product.status, product.title),
           totalInventory: product.totalInventory ?? 0,
           minimumPrice,
         },
@@ -637,7 +661,7 @@ export async function fetchShopifyOverview(
         vendor: product.vendor || null,
         productType: product.productType || null,
         tags: product.tags,
-        status: product.status.toUpperCase(),
+        status: normalizeProductStatus(product.status, product.title),
         totalInventory: product.totalInventory ?? 0,
         mediaCount: product.mediaCount?.count ?? 0,
         variantsCount: product.variantsCount?.count ?? 0,
