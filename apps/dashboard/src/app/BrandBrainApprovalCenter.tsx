@@ -180,9 +180,9 @@ export default function BrandBrainApprovalCenter() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ trigger: "dashboard" }),
       });
-      const payload = (await res.json()) as { error?: string; metrics?: { proposalsCreated?: number } };
+      const payload = (await res.json()) as { error?: string; metrics?: { provisionalSaved?: number } };
       if (!res.ok) throw new Error(payload.error ?? "Unable to run completion.");
-      setNotice(payload.metrics?.proposalsCreated ? `Completion queued ${payload.metrics.proposalsCreated} suggestion(s) for review.` : "Completion checked — nothing new to propose.");
+      setNotice(payload.metrics?.provisionalSaved ? `Completion queued ${payload.metrics.provisionalSaved} suggestion(s) for review.` : "Completion checked — nothing new to propose.");
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to run completion.");
