@@ -361,10 +361,21 @@ export default function OnboardingWizard() {
         setError("Enter the official website URL, starting with http(s)://.");
         return;
       }
+      const normalizedUrl = websiteUrl.trim();
+      const normalizedName = businessName.trim();
+      // Kick off existing-brand discovery & assessment in the background without blocking onboarding.
+      void fetch("/api/brand-discovery/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          websiteUrl: normalizedUrl,
+          businessName: normalizedName,
+        }),
+      }).catch(() => undefined);
       void continueFrom("brand", {
         brandPath,
-        businessName: businessName.trim(),
-        websiteUrl: websiteUrl.trim(),
+        businessName: normalizedName,
+        websiteUrl: normalizedUrl,
       });
       return;
     }
@@ -950,12 +961,13 @@ export default function OnboardingWizard() {
                     }}
                   />
                 </label>
-                <WebsiteAnalyzer websiteUrl={websiteUrl} />
+                <WebsiteAnalyzer websiteUrl={websiteUrl} businessName={businessName} />
                 <div className="ob-notice" role="status">
-                  <strong>What happens next.</strong>
+                  <strong>Cohorio Intelligence assessment.</strong>
                   <p>
-                    Website analysis and asset import arrive in Milestone 2. Your
-                    URL is saved now, so discovery can start from it later.
+                    Importing your brand inspects your website, detects storefront
+                    and channel signals, evaluates twelve brand dimensions, and
+                    surfaces actionable improvement opportunities on your dashboard.
                   </p>
                 </div>
               </>

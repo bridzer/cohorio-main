@@ -46,6 +46,38 @@ export async function listBrandAssets(workspaceId: string) {
   return result.rows.map(publicAsset);
 }
 
+export type BrandAssetExcerpt = {
+  id: string;
+  filename: string;
+  mimeType: string;
+  extractedText: string;
+  createdAt: string;
+};
+
+export async function listBrandAssetExcerpts(workspaceId: string, limit = 10): Promise<BrandAssetExcerpt[]> {
+  const result = await query<{
+    id: string;
+    filename: string;
+    mime_type: string;
+    extracted_text: string;
+    created_at: Date | string;
+  }>(
+    `SELECT id, filename, mime_type, extracted_text, created_at
+       FROM brand_assets
+      WHERE workspace_id = $1 AND extracted_text IS NOT NULL AND length(trim(extracted_text)) > 0
+      ORDER BY created_at DESC
+      LIMIT $2`,
+    [workspaceId, limit],
+  );
+  return result.rows.map((row) => ({
+    id: row.id,
+    filename: row.filename,
+    mimeType: row.mime_type,
+    extractedText: row.extracted_text,
+    createdAt: new Date(row.created_at).toISOString(),
+  }));
+}
+
 export async function saveBrandAsset(input: {
   workspaceId: string;
   filename: string;

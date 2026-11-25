@@ -124,6 +124,16 @@ export async function POST(request: NextRequest) {
         });
       }
     }
+    // New document text may unlock Brand Brain candidates — queue completion without blocking upload response.
+    if (saved.length) {
+      const { brandBrainService } = await import("@/lib/brand-brain/service");
+      void brandBrainService
+        .runCompletion(access.workspaceId, {
+          organizationId: access.organizationId,
+          trigger: "evidence",
+        })
+        .catch(() => undefined);
+    }
     return NextResponse.json({ assets: saved, rejected });
   } catch (error) {
     const originResponse = originErrorResponse(error);

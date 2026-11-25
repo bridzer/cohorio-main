@@ -1,0 +1,82 @@
+/* Brand assessment + recommendations (Milestone 1 of the assessment spec). */
+
+.assess-list .assess-track {
+  height: 6px;
+  margin: 8px 0;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--line, #e3e6df);
+}
+
+.assess-list .assess-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2f6f4f;
+}
+
+.review-badges em.st-complete {
+  background: #e4f1e7;
+  color: #2f6b48;
+}
+
+.review-badges em.st-needs_input {
+  background: #fdf3e3;
+  color: #7a6420;
+}
+
+.review-badges em.st-low_confidence {
+  background: #f4e9ef;
+  color: #8a2f5b;
+}
+
+.review-badges em.pr-high {
+  background: #fce9e7;
+  color: #9a4037;
+}
+
+.review-badges em.pr-medium {
+  background: #eef3ea;
+  color: #3d5248;
+}
+
+.review-badges em.pr-low {
+  background: #f1f0ed;
+  color: #7b7a76;
+}
+
+.review-next {
+  margin: 0;
+  color: #2f6b48;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.review-muted {
+  margin: 0;
+  color: var(--muted, #6c756f);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.review-muted strong {
+  color: #33463d;
+}
+
+.assess-rec-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.assess-rec-edit input,
+.assess-rec-edit textarea,
+.assess-rec-edit select {
+  border: 1px solid var(--line, #e3e6df);
+  border-radius: 8px;
+  background: var(--panel, #fff);
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+}

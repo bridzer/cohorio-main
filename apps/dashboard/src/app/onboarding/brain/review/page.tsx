@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CONTEXT_SECTIONS } from "@/lib/marketing-context";
 import "./review.css";
+import "./assessment.css";
 
 type Proposal = {
   section: string;
@@ -31,6 +33,39 @@ type BrainVersion = {
   createdAt: string;
 };
 
+type DimensionAssessment = {
+  dimension: string;
+  label: string;
+  status: string;
+  confidence: string;
+  completeness: number;
+  evidence: { label: string; source: string; tier: string; stale: boolean }[];
+  source: string;
+  explanation: string;
+  gaps: string[];
+  nextAction: string;
+  assessedAt: string;
+};
+
+type Recommendation = {
+  id: string;
+  dedupeKey: string;
+  section: string | null;
+  title: string;
+  description: string;
+  evidence: string[];
+  why: string;
+  solution: string;
+  outcome: string;
+  priority: string;
+  confidence: string;
+  effort: string;
+  workflow: Record<string, unknown>;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 function fieldLabel(section: string, field: string) {
   const definition = CONTEXT_SECTIONS.find((entry) => entry.id === section);
   const label = definition?.fields.find((entry) => entry.id === field)?.label;
@@ -38,6 +73,7 @@ function fieldLabel(section: string, field: string) {
 }
 
 export default function BrandBrainReviewPage() {
+  const router = useRouter();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [gaps, setGaps] = useState<Gap[]>([]);
   const [overall, setOverall] = useState(0);
@@ -48,15 +84,32 @@ export default function BrandBrainReviewPage() {
   const [notice, setNotice] = useState("");
   const [editing, setEditing] = useState("");
   const [editValue, setEditValue] = useState("");
+  const [editingRecId, setEditingRecId] = useState("");
+  const [recDraft, setRecDraft] = useState<{
+    title: string;
+    description: string;
+    solution: string;
+    priority: string;
+  }>({ title: "", description: "", solution: "", priority: "medium" });
   const [gapDrafts, setGapDrafts] = useState<Record<string, string>>({});
   const [snapshotNote, setSnapshotNote] = useState("");
+  const [assessment, setAssessment] = useState<DimensionAssessment[]>([]);
+  const [assessmentOverallStats, setAssessmentOverallStats] = useState<{
+    completeness: number;
+    confidence: string;
+  } | null>(null);
+  const [assessed, setAssessed] = useState(false);
+  const [recs, setRecs] = useState<Recommendation[]>([]);
 
   const refresh = useCallback(async () => {
-    const [proposalsResponse, gapsResponse, versionsResponse] = await Promise.all([
-      fetch("/api/brand-brain/proposals", { cache: "no-store" }),
-      fetch("/api/brand-brain/gaps", { cache: "no-store" }),
-      fetch("/api/brand-brain/versions", { cache: "no-store" }),
-    ]);
+    const [proposalsResponse, gapsResponse, versionsResponse, assessmentResponse, recsResponse] =
+      await Promise.all([
+        fetch("/api/brand-brain/proposals", { cache: "no-store" }),
+        fetch("/api/brand-brain/gaps", { cache: "no-store" }),
+        fetch("/api/brand-brain/versions", { cache: "no-store" }),
+        fetch("/api/brand-brain/assessment", { cache: "no-store" }),
+        fetch("/api/brand-brain/recommendations", { cache: "no-store" }),
+      ]);
     const proposalsPayload = (await proposalsResponse.json()) as {
       proposals?: Proposal[];
       error?: string;
@@ -70,6 +123,16 @@ export default function BrandBrainReviewPage() {
       versions?: BrainVersion[];
       error?: string;
     };
+    const assessmentPayload = (await assessmentResponse.json()) as {
+      assessment?: DimensionAssessment[];
+      overall?: { completeness?: number; confidence?: string };
+      assessed?: boolean;
+      error?: string;
+    };
+    const recsPayload = (await recsResponse.json()) as {
+      recommendations?: Recommendation[];
+      error?: string;
+    };
     if (!proposalsResponse.ok) {
       throw new Error(proposalsPayload.error ?? "Unable to load suggestions.");
     }
@@ -79,10 +142,27 @@ export default function BrandBrainReviewPage() {
     if (!versionsResponse.ok) {
       throw new Error(versionsPayload.error ?? "Unable to load versions.");
     }
+    if (!assessmentResponse.ok) {
+      throw new Error(assessmentPayload.error ?? "Unable to load assessment.");
+    }
+    if (!recsResponse.ok) {
+      throw new Error(recsPayload.error ?? "Unable to load recommendations.");
+    }
     setProposals(proposalsPayload.proposals ?? []);
     setGaps(gapsPayload.gaps ?? []);
     setOverall(gapsPayload.completeness?.overall ?? 0);
     setVersions(versionsPayload.versions ?? []);
+    setAssessment(assessmentPayload.assessment ?? []);
+    setAssessmentOverallStats(
+      assessmentPayload.overall?.completeness !== undefined
+        ? {
+            completeness: assessmentPayload.overall.completeness,
+            confidence: assessmentPayload.overall.confidence ?? "low",
+          }
+        : null,
+    );
+    setAssessed(Boolean(assessmentPayload.assessed));
+    setRecs(recsPayload.recommendations ?? []);
   }, []);
 
   useEffect(() => {
@@ -259,6 +339,115 @@ export default function BrandBrainReviewPage() {
     }
   }
 
+  async function runAssessment() {
+    setBusy("assess");
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/brand-brain/assessment", { method: "POST" });
+      const payload = (await response.json()) as {
+        overall?: { completeness?: number; confidence?: string };
+        recommendations?: { proposed?: number; skipped?: number };
+        error?: string;
+      };
+      if (!response.ok) throw new Error(payload.error ?? "Unable to run assessment.");
+      setNotice(
+        `Assessment complete: ${payload.overall?.completeness ?? 0}% complete, ` +
+          `${payload.overall?.confidence ?? "unknown"} confidence. ` +
+          `${payload.recommendations?.proposed ?? 0} recommendation(s) created.`,
+      );
+      await refresh();
+    } catch (assessError) {
+      setError(assessError instanceof Error ? assessError.message : "Unable to run assessment.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function actOnRecommendation(id: string, action: string) {
+    setBusy(`rec:${id}:${action}`);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/brand-brain/recommendations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, id }),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Unable to update recommendation.");
+      setNotice("Recommendation updated.");
+      await refresh();
+    } catch (recError) {
+      setError(recError instanceof Error ? recError.message : "Unable to update recommendation.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function saveRecommendationEdit(id: string) {
+    setBusy(`rec:${id}:edit`);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/brand-brain/recommendations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "edit", id, ...recDraft }),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Unable to save recommendation.");
+      setEditingRecId("");
+      setNotice("Recommendation edited.");
+      await refresh();
+    } catch (recError) {
+      setError(recError instanceof Error ? recError.message : "Unable to edit recommendation.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function launchRecommendationWorkflow(rec: Recommendation) {
+    const workflow = rec.workflow;
+    if (rec.status === "NEW" || rec.status === "REVIEW_REQUIRED" || rec.status === "DEFERRED") {
+      await actOnRecommendation(rec.id, "accept");
+      await actOnRecommendation(rec.id, "start");
+    } else if (rec.status === "ACCEPTED") {
+      await actOnRecommendation(rec.id, "start");
+    }
+    switch (workflow.kind) {
+      case "answer-fields":
+        router.push("/onboarding/brain");
+        break;
+      case "upload-assets":
+      case "run-analysis":
+        router.push("/onboarding");
+        break;
+      case "connect-provider":
+        router.push("/connections");
+        break;
+      default:
+        break;
+    }
+  }
+
+  function workflowLabel(workflow: Record<string, unknown>) {
+    switch (workflow.kind) {
+      case "answer-fields": {
+        const fields = Array.isArray(workflow.fields) ? workflow.fields.join(", ") : "";
+        return `Answer in Brand Brain › ${String(workflow.section ?? "")}: ${fields}`;
+      }
+      case "upload-assets":
+        return "Upload brand assets in onboarding";
+      case "run-analysis":
+        return "Run website analysis in onboarding";
+      case "connect-provider":
+        return `Connect ${String(workflow.provider ?? "the integration")}`;
+      default:
+        return "Review and act";
+    }
+  }
+
   if (loading) {
     return (
       <main className="review-loading">
@@ -297,6 +486,235 @@ export default function BrandBrainReviewPage() {
           {notice}
         </p>
       )}
+
+      <section aria-labelledby="review-assessment">
+        <div className="review-section-head">
+          <div>
+            <h2 id="review-assessment">Brand assessment</h2>
+            <p>
+              Completeness and evidence confidence, kept separate by design.
+              {assessmentOverallStats
+                ? ` Overall: ${assessmentOverallStats.completeness}% complete · ${assessmentOverallStats.confidence} confidence.`
+                : ""}
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={busy === "assess"}
+            onClick={() => void runAssessment()}
+          >
+            {busy === "assess" ? "Assessing…" : assessed ? "Re-run assessment" : "Run assessment"}
+          </button>
+        </div>
+        {!assessed && assessment.length === 0 ? (
+          <p className="review-empty">
+            No assessment yet. Run it to score all twelve Brand Brain dimensions.
+          </p>
+        ) : (
+          <ul className="review-list assess-list">
+            {assessment.map((dimension) => (
+              <li key={dimension.dimension}>
+                <div className="review-item-head">
+                  <strong>{dimension.label}</strong>
+                  <span className="review-badges">
+                    <em className={`st-${dimension.status}`}>{dimension.status.replace("_", " ")}</em>
+                    <em>{dimension.confidence} confidence</em>
+                    <em>{dimension.completeness}%</em>
+                  </span>
+                </div>
+                <div className="assess-track" aria-hidden="true">
+                  <span style={{ width: `${dimension.completeness}%` }} />
+                </div>
+                <p className="review-muted">{dimension.explanation}</p>
+                {dimension.evidence.length > 0 && (
+                  <p className="review-muted">
+                    Evidence: {dimension.evidence.map((item) => item.label).join("; ")}
+                  </p>
+                )}
+                {dimension.nextAction && (
+                  <p className="review-next">Next: {dimension.nextAction}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section aria-labelledby="review-recommendations">
+        <div className="review-section-head">
+          <div>
+            <h2 id="review-recommendations">Brand improvement opportunities ({recs.length})</h2>
+            <p>Created by assessments. Accept, start, complete, defer, or dismiss.</p>
+          </div>
+        </div>
+        {recs.length === 0 ? (
+          <p className="review-empty">
+            Nothing open. Run an assessment to surface the next improvements.
+          </p>
+        ) : (
+          <ul className="review-list">
+            {recs.map((rec) => {
+              const isEditingRec = editingRecId === rec.id;
+              return (
+              <li key={rec.id}>
+                <div className="review-item-head">
+                  <strong>{rec.title}</strong>
+                  <span className="review-badges">
+                    <em className={`pr-${rec.priority}`}>{rec.priority}</em>
+                    <em>{rec.confidence} confidence</em>
+                    <em>effort {rec.effort}</em>
+                    <em>{rec.status.replace("_", " ")}</em>
+                  </span>
+                </div>
+                {isEditingRec ? (
+                  <div className="assess-rec-edit">
+                    <input
+                      value={recDraft.title}
+                      placeholder="Problem title"
+                      onChange={(event) =>
+                        setRecDraft((current) => ({ ...current, title: event.target.value }))
+                      }
+                    />
+                    <textarea
+                      rows={2}
+                      value={recDraft.description}
+                      placeholder="Problem description"
+                      onChange={(event) =>
+                        setRecDraft((current) => ({ ...current, description: event.target.value }))
+                      }
+                    />
+                    <textarea
+                      rows={2}
+                      value={recDraft.solution}
+                      placeholder="Proposed solution"
+                      onChange={(event) =>
+                        setRecDraft((current) => ({ ...current, solution: event.target.value }))
+                      }
+                    />
+                    <select
+                      value={recDraft.priority}
+                      onChange={(event) =>
+                        setRecDraft((current) => ({ ...current, priority: event.target.value }))
+                      }
+                    >
+                      <option value="high">high priority</option>
+                      <option value="medium">medium priority</option>
+                      <option value="low">low priority</option>
+                    </select>
+                  </div>
+                ) : (
+                  <>
+                    <p>{rec.description}</p>
+                    {rec.evidence.length > 0 && (
+                      <p className="review-muted">
+                        <strong>Evidence:</strong> {rec.evidence.slice(0, 3).join("; ")}
+                      </p>
+                    )}
+                    <p className="review-muted">
+                      <strong>Why:</strong> {rec.why}
+                    </p>
+                    <p className="review-muted">
+                      <strong>Do:</strong> {rec.solution}
+                    </p>
+                    <p className="review-muted">
+                      <strong>Outcome:</strong> {rec.outcome} · {workflowLabel(rec.workflow)}
+                    </p>
+                  </>
+                )}
+                <div className="review-item-actions">
+                  {isEditingRec ? (
+                    <>
+                      <button
+                        type="button"
+                        className="primary"
+                        disabled={busy === `rec:${rec.id}:edit`}
+                        onClick={() => void saveRecommendationEdit(rec.id)}
+                      >
+                        Save changes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingRecId("")}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="primary"
+                        disabled={busy.startsWith(`rec:${rec.id}:`)}
+                        onClick={() => void launchRecommendationWorkflow(rec)}
+                      >
+                        Implement
+                      </button>
+                      {(rec.status === "NEW" || rec.status === "REVIEW_REQUIRED" || rec.status === "DEFERRED") && (
+                        <>
+                          <button
+                            type="button"
+                            disabled={busy === `rec:${rec.id}:accept`}
+                            onClick={() => void actOnRecommendation(rec.id, "accept")}
+                          >
+                            Accept
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy === `rec:${rec.id}:defer`}
+                            onClick={() => void actOnRecommendation(rec.id, "defer")}
+                          >
+                            Defer
+                          </button>
+                        </>
+                      )}
+                      {rec.status === "ACCEPTED" && (
+                        <button
+                          type="button"
+                          disabled={busy === `rec:${rec.id}:start`}
+                          onClick={() => void actOnRecommendation(rec.id, "start")}
+                        >
+                          Start
+                        </button>
+                      )}
+                      {rec.status === "IN_PROGRESS" && (
+                        <button
+                          type="button"
+                          disabled={busy === `rec:${rec.id}:complete`}
+                          onClick={() => void actOnRecommendation(rec.id, "complete")}
+                        >
+                          Complete
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingRecId(rec.id);
+                          setRecDraft({
+                            title: rec.title,
+                            description: rec.description,
+                            solution: rec.solution,
+                            priority: rec.priority,
+                          });
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy === `rec:${rec.id}:dismiss`}
+                        onClick={() => void actOnRecommendation(rec.id, "dismiss")}
+                      >
+                        Dismiss
+                      </button>
+                    </>
+                  )}
+                </div>
+              </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       <section aria-labelledby="review-suggestions">
         <div className="review-section-head">

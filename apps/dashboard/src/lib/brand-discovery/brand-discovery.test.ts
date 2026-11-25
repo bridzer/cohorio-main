@@ -1,7 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { classifyWebsite } from "./classify";
-import { extractWebsiteFacts } from "./extract";
+import {
+  detectMarketingChannels,
+  extractInternalLinks,
+  extractSeoSignals,
+  extractWebsiteFacts,
+} from "./extract";
 import { ASSET_MAX_BYTES, csvToText, sniffMime } from "./assets";
+import { crawlWebsiteForBrand } from "./crawl";
+import { synthesizeWebsiteBrandIntelligence } from "./intelligence";
+import { PublicUrlError } from "@/lib/http/public-url";
 
 describe("classifyWebsite", () => {
   it("recognizes a Shopify storefront with high confidence", () => {
@@ -113,5 +121,130 @@ describe("asset validation and extraction", () => {
 
   it("caps uploads at eight megabytes", () => {
     expect(ASSET_MAX_BYTES).toBe(8 * 1024 * 1024);
+  });
+});
+
+describe("SEO, internal links, and channel extraction", () => {
+  it("flags concrete on-page SEO opportunities and detects marketing channels", () => {
+    const html = `
+      <html><head><title>Hi</title></head><body>
+      <p>Short copy.</p>
+      <a href="/about">About</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/cart">Cart</a>
+      <a href="https://evil.example/about">External</a>
+      <script src="https://www.googletagmanager.com/gtag/js"></script>
+      <script>fbq('init', '123');</script>
+      </body></html>
+    `;
+    const facts = extractWebsiteFacts(html);
+    const seo = extractSeoSignals(html);
+    expect(seo.hasDescription).toBe(false);
+    expect(seo.h1Count).toBe(0);
+    expect(seo.hasCanonical).toBe(false);
+    expect(seo.hasStructuredData).toBe(false);
+    expect(seo.opportunities.length).toBeGreaterThanOrEqual(5);
+    expect(extractInternalLinks(html, "https://acme.com")).toEqual([
+      "https://acme.com/about",
+      "https://acme.com/pricing",
+    ]);
+    expect(detectMarketingChannels(html, facts)).toEqual(
+      expect.arrayContaining(["Google Analytics / Tag Manager", "Meta Pixel"]),
+    );
+  });
+});
+
+describe("crawlWebsiteForBrand and intelligence synthesis", () => {
+  it("retries transient fetch errors, crawls internal pages, and never follows SSRF URLs", async () => {
+    let homeAttempts = 0;
+    const fetchHtml = vi.fn(async (target: string) => {
+      if (target === "https://acme.com") {
+        homeAttempts += 1;
+        if (homeAttempts === 1) throw new Error("That page returned HTTP 503.");
+        return {
+          finalUrl: "https://acme.com",
+          html: `<html><head><title>Acme Coffee Roasters</title>
+            <meta name="description" content="Small-batch specialty coffee delivered fresh to your door every week.">
+            </head><body><h1>Fresh coffee roasted daily</h1>
+            <a href="/about">About us</a><a href="/products">Products</a>
+            <script src="https://cdn.shopify.com/shop.js"></script></body></html>`,
+        };
+      }
+      if (target.endsWith("/about")) {
+        return {
+          finalUrl: "https://acme.com/about",
+          html: "<html><head><title>About Acme</title></head><body><h1>Our Story</h1><p>Direct trade beans.</p></body></html>",
+        };
+      }
+      throw new Error("That page returned HTTP 404.");
+    });
+
+    const crawl = await crawlWebsiteForBrand("https://acme.com", {
+      fetchHtml,
+      backoffMs: 0,
+    });
+    expect(homeAttempts).toBe(2);
+    expect(crawl.classification.platform).toBe("shopify");
+    expect(crawl.pages.length).toBe(2);
+    expect(crawl.crawlNotes.some((note) => note.includes("/products"))).toBe(true);
+
+    await expect(
+      crawlWebsiteForBrand("http://127.0.0.1", {
+        fetchHtml: async () => {
+          throw new PublicUrlError();
+        },
+        backoffMs: 0,
+      }),
+    ).rejects.toBeInstanceOf(PublicUrlError);
+  });
+
+  it("synthesizes structured intelligence and falls back safely on bad LLM output", async () => {
+    const crawl = await crawlWebsiteForBrand("https://acme.com", {
+      fetchHtml: async () => ({
+        finalUrl: "https://acme.com",
+        html: `<html><head><title>Acme</title><meta name="description" content="Handmade ceramic mugs."></head>
+          <body><h1>Acme Mugs</h1><script src="https://cdn.shopify.com/s.js"></script></body></html>`,
+      }),
+      backoffMs: 0,
+    });
+
+    const fallback = await synthesizeWebsiteBrandIntelligence({
+      businessName: "Acme",
+      crawl,
+      chatImpl: async () => "not-json",
+    });
+    expect(fallback.usedLlm).toBe(false);
+    expect(fallback.inferredBusinessModel).toContain("Shopify");
+    expect(fallback.competitors).toEqual([]);
+
+    const llmChat = vi.fn<
+      (messages: { role: string; content: string }[]) => Promise<string>
+    >(async () =>
+      JSON.stringify({
+        industry: "Home & Kitchen",
+        inferredBusinessModel: "DTC e-commerce",
+        productsServices: ["Ceramic mugs"],
+        messaging: ["Handmade ceramic mugs."],
+        targetAudiences: ["Specialty coffee drinkers"],
+        positioning: "Artisanal everyday drinkware",
+        voiceCharacteristics: ["Warm", "Craft-focused"],
+        competitors: [],
+        missingInfo: ["Pricing tiers not listed"],
+        intelligenceSummary: "Acme sells handmade ceramic mugs via Shopify.",
+      }),
+    );
+    const enriched = await synthesizeWebsiteBrandIntelligence({
+      businessName: "Acme",
+      crawl,
+      chatImpl: llmChat,
+    });
+    expect(enriched.usedLlm).toBe(true);
+    expect(enriched.industry).toBe("Home & Kitchen");
+    expect(enriched.productsServices).toEqual(["Ceramic mugs"]);
+    // Ensure website text is always placed in user role data, never system prompt.
+    const sentMessages = llmChat.mock.calls[0]?.[0] ?? [];
+    expect(sentMessages[0]?.role).toBe("system");
+    expect(sentMessages[0]?.content).not.toContain("Handmade ceramic mugs.");
+    expect(sentMessages[1]?.role).toBe("user");
   });
 });

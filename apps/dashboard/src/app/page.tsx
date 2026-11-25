@@ -10,6 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import { PENDING_PROMPT_KEY } from "@/lib/agent-ui/handoff";
 import FirstObjectiveBanner from "./FirstObjectiveBanner";
+import BrandBrainApprovalCenter from "./BrandBrainApprovalCenter";
 
 type IconName =
   | "spark"
@@ -676,6 +677,8 @@ export default function Home() {
           </section>
 
           <FirstObjectiveBanner />
+
+          <BrandBrainApprovalCenter />
 
           <section className="copilot-card">
             <div className="copilot-glow" />

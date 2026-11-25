@@ -19,10 +19,14 @@ function errorResponse(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
 }
 
+import { runBrandCompletion } from "@/lib/brand-brain/completion";
+
 /**
  * Finishes onboarding for the workspace. The first three stages must be
  * complete and an objective chosen; channels/integrations stay optional per
  * the no-forced-connections rule. The timestamp is server-owned.
+ * After persisting completion, kicks off brand brain auto-completion in the
+ * background (non-blocking, idempotent).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -52,6 +56,11 @@ export async function POST(request: NextRequest) {
     if (!session) {
       return errorResponse("Onboarding session not found.", 404);
     }
+    // Fire-and-forget: do not block dashboard entry; job tracks status.
+    void runBrandCompletion(access.workspaceId, {
+      organizationId: access.organizationId ?? null,
+      trigger: "onboarding",
+    }).catch(() => undefined);
     return NextResponse.json({ session });
   } catch (error) {
     const originResponse = originErrorResponse(error);

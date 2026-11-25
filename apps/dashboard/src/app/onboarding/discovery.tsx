@@ -30,6 +30,24 @@ type Analysis = {
   socials: { network: string; url: string }[];
   headings: string[];
   signals: string[];
+  industry?: string | null;
+  inferredBusinessModel?: string | null;
+  productsServices?: string[];
+  messaging?: string[];
+  targetAudiences?: string[];
+  positioning?: string | null;
+  voiceCharacteristics?: string[];
+  marketingChannels?: string[];
+  seoOpportunities?: string[];
+  competitors?: string[];
+  missingInfo?: string[];
+  pagesCrawled?: string[];
+  intelligenceSummary?: string | null;
+};
+
+type DiscoveryAssessmentSummary = {
+  overall?: { completeness: number; confidence: string };
+  recommendations?: { proposed: number; skipped: number };
 };
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -51,8 +69,16 @@ const MODEL_LABELS: Record<string, string> = {
   unknown: "Unclassified",
 };
 
-export function WebsiteAnalyzer({ websiteUrl }: { websiteUrl: string }) {
+export function WebsiteAnalyzer({
+  websiteUrl,
+  businessName,
+}: {
+  websiteUrl: string;
+  businessName?: string;
+}) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [assessmentSummary, setAssessmentSummary] =
+    useState<DiscoveryAssessmentSummary | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -84,16 +110,24 @@ export function WebsiteAnalyzer({ websiteUrl }: { websiteUrl: string }) {
       const response = await fetch("/api/brand-discovery/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ websiteUrl }),
+        body: JSON.stringify({ websiteUrl, businessName }),
       });
       const payload = (await response.json()) as {
         analysis?: Analysis | null;
+        overall?: { completeness: number; confidence: string };
+        recommendations?: { proposed: number; skipped: number };
         error?: string;
       };
       if (!response.ok || !payload.analysis) {
         throw new Error(payload.error ?? "Unable to analyze this website.");
       }
       setAnalysis(payload.analysis);
+      if (payload.overall) {
+        setAssessmentSummary({
+          overall: payload.overall,
+          recommendations: payload.recommendations,
+        });
+      }
     } catch (runError) {
       setError(
         runError instanceof Error ? runError.message : "Unable to analyze this website.",
@@ -112,7 +146,11 @@ export function WebsiteAnalyzer({ websiteUrl }: { websiteUrl: string }) {
         title={websiteUrl.trim() ? undefined : "Enter the website URL first"}
         onClick={() => void run()}
       >
-        {busy ? "Analyzing website…" : analysis ? "Re-analyze website" : "Analyze website"}
+        {busy
+          ? "Analyzing website & assessing brand…"
+          : analysis
+            ? "Re-analyze website & assess"
+            : "Analyze website & assess brand"}
       </button>
       {error && (
         <p className="ob-dx-error" role="alert">
@@ -131,23 +169,77 @@ export function WebsiteAnalyzer({ websiteUrl }: { websiteUrl: string }) {
             <span className={`ob-dx-badge tone-${analysis.confidence}`}>
               {analysis.confidence} confidence
             </span>
+            {analysis.industry && (
+              <span className="ob-dx-badge">{analysis.industry}</span>
+            )}
           </div>
           {analysis.title && <strong>{analysis.title}</strong>}
-          {analysis.description && <p>{analysis.description}</p>}
-          {(analysis.emails.length > 0 || analysis.socials.length > 0) && (
+          {analysis.intelligenceSummary ? (
+            <p>{analysis.intelligenceSummary}</p>
+          ) : (
+            analysis.description && <p>{analysis.description}</p>
+          )}
+          {analysis.inferredBusinessModel && (
+            <p className="ob-dx-muted">
+              <strong>Business model:</strong> {analysis.inferredBusinessModel}
+            </p>
+          )}
+          {Boolean(analysis.productsServices?.length) && (
+            <p className="ob-dx-muted">
+              <strong>Products / services:</strong>{" "}
+              {analysis.productsServices!.slice(0, 5).join(", ")}
+            </p>
+          )}
+          {Boolean(analysis.targetAudiences?.length) && (
+            <p className="ob-dx-muted">
+              <strong>Audience signals:</strong>{" "}
+              {analysis.targetAudiences!.slice(0, 4).join(", ")}
+            </p>
+          )}
+          {Boolean(analysis.voiceCharacteristics?.length) && (
+            <p className="ob-dx-muted">
+              <strong>Voice traits:</strong>{" "}
+              {analysis.voiceCharacteristics!.slice(0, 4).join(", ")}
+            </p>
+          )}
+          {(analysis.emails.length > 0 ||
+            analysis.socials.length > 0 ||
+            Boolean(analysis.marketingChannels?.length)) && (
             <p className="ob-dx-muted">
               {[
                 analysis.emails.length ? `${analysis.emails.length} contact email(s)` : null,
-                analysis.socials.length
-                  ? `Social: ${analysis.socials.map((entry) => entry.network).join(", ")}`
-                  : null,
+                analysis.marketingChannels?.length
+                  ? `Channels: ${analysis.marketingChannels.slice(0, 5).join(", ")}`
+                  : analysis.socials.length
+                    ? `Social: ${analysis.socials.map((entry) => entry.network).join(", ")}`
+                    : null,
               ]
                 .filter(Boolean)
                 .join(" · ")}
             </p>
           )}
+          {Boolean(analysis.seoOpportunities?.length) && (
+            <p className="ob-dx-muted">
+              <strong>SEO opportunities ({analysis.seoOpportunities!.length}):</strong>{" "}
+              {analysis.seoOpportunities!.slice(0, 2).join(" ")}
+            </p>
+          )}
+          {Boolean(analysis.missingInfo?.length) && (
+            <p className="ob-dx-muted">
+              <strong>Missing / unverified:</strong>{" "}
+              {analysis.missingInfo!.slice(0, 2).join(" ")}
+            </p>
+          )}
           {analysis.signals.length > 0 && (
-            <p className="ob-dx-muted">Why: {analysis.signals.join("; ")}</p>
+            <p className="ob-dx-muted">Signals: {analysis.signals.join("; ")}</p>
+          )}
+          {assessmentSummary?.overall && (
+            <p className="ob-dx-note">
+              Brand Assessment updated: {assessmentSummary.overall.completeness}% complete ·{" "}
+              {assessmentSummary.overall.confidence} evidence confidence ·{" "}
+              {assessmentSummary.recommendations?.proposed ?? 0} opportunity(ies) queued.{" "}
+              <a href="/onboarding/brain/review">Inspect full assessment</a>
+            </p>
           )}
         </div>
       )}
@@ -300,194 +392,325 @@ export function AssetUploader() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Adaptive discovery questions (Step 3, build path)                   */
+/* Adaptive discovery questions (Step 3, build path) — Milestone 2     */
+/* Uses /api/brand-brain/discovery to load mode-annotated questions.    */
 /* ------------------------------------------------------------------ */
 
-type DiscoveryQuestion = {
+type DiscoveryAnswerMode = "autofill" | "suggestion" | "placeholder";
+
+type DiscoveryQuestionItem = {
   id: string;
   label: string;
-  hint: string;
   section: string;
   field: string;
+  sectionTitle: string;
+  multiline: boolean;
+  alreadyConfirmed: boolean;
+  confirmedValue: string | null;
+  mode: DiscoveryAnswerMode;
+  suggestedValue: string;
+  source: string | null;
+  sourceType: string | null;
+  confidence: string | null;
+  verificationStatus: string;
+  reasoning: string | null;
+  evidence: string[];
+  placeholderExample: string;
+  usefulHint: string;
 };
 
-const DISCOVERY_QUESTIONS: Record<string, DiscoveryQuestion[]> = {
-  ecommerce: [
-    { id: "products", label: "What products do you sell?", hint: "Name them plainly.", section: "productOverview", field: "whatItDoes" },
-    { id: "customers", label: "Who are your ideal customers?", hint: "Who buys, and why them?", section: "targetAudience", field: "targetCompanies" },
-    { id: "difference", label: "What makes your products different?", hint: "One honest edge.", section: "differentiation", field: "differentiators" },
-    { id: "goal", label: "What should marketing achieve first?", hint: "One outcome.", section: "goals", field: "businessGoal" },
-  ],
-  "physical-retail": [
-    { id: "products", label: "What do you sell?", hint: "Categories, not every SKU.", section: "productOverview", field: "whatItDoes" },
-    { id: "customers", label: "Who are your customers?", hint: "Locals, visitors, regulars?", section: "targetAudience", field: "targetCompanies" },
-    { id: "difference", label: "What makes your store different?", hint: "Why walk in?", section: "differentiation", field: "differentiators" },
-    { id: "goal", label: "What should marketing achieve first?", hint: "One outcome.", section: "goals", field: "businessGoal" },
-  ],
-  "professional-services": [
-    { id: "services", label: "What services do you provide?", hint: "Plain language.", section: "productOverview", field: "whatItDoes" },
-    { id: "clients", label: "Who are your target clients?", hint: "Industry, size, role.", section: "targetAudience", field: "targetCompanies" },
-    { id: "problems", label: "What problems do you solve?", hint: "Their words if you have them.", section: "problems", field: "coreProblem" },
-    { id: "difference", label: "What makes your services different?", hint: "Method, proof, or focus.", section: "differentiation", field: "differentiators" },
-  ],
-  "consumer-services": [
-    { id: "services", label: "What services do you offer?", hint: "Menu of services.", section: "productOverview", field: "whatItDoes" },
-    { id: "customers", label: "Who are your customers?", hint: "Who books, and when?", section: "targetAudience", field: "targetCompanies" },
-    { id: "difference", label: "What makes the experience different?", hint: "Moment of delight.", section: "differentiation", field: "differentiators" },
-    { id: "goal", label: "What should marketing achieve first?", hint: "Bookings, visits, calls?", section: "goals", field: "businessGoal" },
-  ],
-  "media-content": [
-    { id: "content", label: "What content do you create?", hint: "Formats and topics.", section: "productOverview", field: "whatItDoes" },
-    { id: "audience", label: "Who is your audience?", hint: "Who subscribes or follows?", section: "targetAudience", field: "targetCompanies" },
-    { id: "difference", label: "What makes your content different?", hint: "Voice, access, depth?", section: "differentiation", field: "differentiators" },
-    { id: "goal", label: "What should marketing achieve first?", hint: "Subscribers, sponsors, sales?", section: "goals", field: "businessGoal" },
-  ],
-  "software-technology": [
-    { id: "product", label: "What product or technology are you building?", hint: "What it does, simply.", section: "productOverview", field: "whatItDoes" },
-    { id: "users", label: "Who are the intended users?", hint: "Role and company type.", section: "targetAudience", field: "targetCompanies" },
-    { id: "problems", label: "What problems does it solve?", hint: "Cost of the status quo.", section: "problems", field: "coreProblem" },
-    { id: "model", label: "What is the business model?", hint: "How customers buy.", section: "productOverview", field: "businessModel" },
-  ],
-  "civic-social": [
-    { id: "services", label: "What services do you provide?", hint: "Programs and support.", section: "productOverview", field: "whatItDoes" },
-    { id: "community", label: "Who is your community?", hint: "Who you serve.", section: "targetAudience", field: "targetCompanies" },
-    { id: "difference", label: "What makes your approach different?", hint: "Trust, reach, method.", section: "differentiation", field: "differentiators" },
-    { id: "goal", label: "What should marketing achieve first?", hint: "Awareness, donors, volunteers?", section: "goals", field: "businessGoal" },
-  ],
+type QuestionState = {
+  value: string;
+  action: "accept" | "edit" | "reject" | "skip" | "pending";
 };
 
-const SECTION_TITLES: Record<string, string> = {
-  productOverview: "Product overview",
-  targetAudience: "Target audience",
-  problems: "Problems",
-  differentiation: "Differentiation",
-  goals: "Goals",
+const MODE_BADGES: Record<DiscoveryAnswerMode, { label: string; className: string }> = {
+  autofill: { label: "Auto-filled", className: "ob-dx-mode-badge mode-autofill" },
+  suggestion: { label: "AI suggestion", className: "ob-dx-mode-badge mode-suggestion" },
+  placeholder: { label: "Your answer needed", className: "ob-dx-mode-badge mode-placeholder" },
 };
+
+function DiscoveryQuestionCard({
+  question,
+  state,
+  onChange,
+}: {
+  question: DiscoveryQuestionItem;
+  state: QuestionState;
+  onChange: (next: QuestionState) => void;
+}) {
+  if (question.alreadyConfirmed) {
+    return (
+      <div className="ob-dx-field ob-dx-confirmed">
+        <span>
+          {question.label}
+          <small>
+            → Brand Brain › {question.sectionTitle}
+          </small>
+        </span>
+        <div className="ob-dx-confirmed-value">
+          <span className="ob-dx-mode-badge mode-confirmed">✓ Confirmed</span>
+          <p>{question.confirmedValue}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const badge = MODE_BADGES[question.mode];
+  const hasValue = question.mode !== "placeholder";
+  const displayValue = state.action === "pending" && hasValue
+    ? question.suggestedValue
+    : state.value;
+  const isDecided = state.action !== "pending";
+
+  return (
+    <div className="ob-dx-field">
+      <span>
+        {question.label}
+        <small>
+          → Brand Brain › {question.sectionTitle}
+        </small>
+      </span>
+      <div className="ob-dx-question-meta">
+        <span className={badge.className}>{badge.label}</span>
+        {question.source && (
+          <span className="ob-dx-source-label">
+            From: {question.source}
+            {question.confidence && ` · ${question.confidence} confidence`}
+          </span>
+        )}
+      </div>
+      {question.reasoning && (
+        <p className="ob-dx-reasoning">{question.reasoning}</p>
+      )}
+      {question.evidence.length > 0 && (
+        <details className="ob-dx-evidence">
+          <summary>Evidence ({question.evidence.length})</summary>
+          <ul>
+            {question.evidence.map((e, i) => (
+              <li key={i}>{e}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+      <textarea
+        rows={question.multiline ? 3 : 2}
+        value={displayValue}
+        placeholder={question.placeholderExample}
+        onChange={(event) =>
+          onChange({ value: event.target.value, action: "edit" })
+        }
+      />
+      <p className="ob-dx-hint">{question.usefulHint}</p>
+      {hasValue && (
+        <div className="ob-dx-actions">
+          <button
+            type="button"
+            className={`ob-dx-action-btn${state.action === "accept" ? " active" : ""}`}
+            disabled={isDecided && state.action !== "accept"}
+            onClick={() => onChange({ value: question.suggestedValue, action: "accept" })}
+          >
+            ✓ Accept
+          </button>
+          <button
+            type="button"
+            className={`ob-dx-action-btn${state.action === "reject" ? " active" : ""}`}
+            disabled={isDecided && state.action !== "reject"}
+            onClick={() => onChange({ value: "", action: "reject" })}
+          >
+            ✕ Reject
+          </button>
+          <button
+            type="button"
+            className={`ob-dx-action-btn${state.action === "skip" ? " active" : ""}`}
+            disabled={isDecided && state.action !== "skip"}
+            onClick={() => onChange({ value: "", action: "skip" })}
+          >
+            Skip
+          </button>
+          {isDecided && (
+            <button
+              type="button"
+              className="ob-dx-action-btn"
+              onClick={() => onChange({ value: question.suggestedValue, action: "pending" })}
+            >
+              Undo
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function DiscoveryQuestions({ categoryId }: { categoryId: string }) {
-  const questions = DISCOVERY_QUESTIONS[categoryId] ?? [];
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
+  const [questions, setQuestions] = useState<DiscoveryQuestionItem[]>([]);
+  const [states, setStates] = useState<Record<string, QuestionState>>({});
+  const [sourcesUsed, setSourcesUsed] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [note, setNote] = useState("");
   const [problem, setProblem] = useState("");
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setQuestions([]);
+    setStates({});
+    setNote("");
+    setProblem("");
+    setLoaded(false);
     void (async () => {
       try {
-        const response = await fetch("/api/marketing-context", { cache: "no-store" });
+        const response = await fetch(
+          `/api/brand-brain/discovery?categoryId=${encodeURIComponent(categoryId)}`,
+          { cache: "no-store" },
+        );
         const payload = (await response.json()) as {
-          context?: MarketingContext;
+          questions?: DiscoveryQuestionItem[];
+          sourcesUsed?: string[];
+          error?: string;
         };
-        if (!response.ok || cancelled) return;
-        const prefill: Record<string, string> = {};
-        for (const question of questions) {
-          const existing =
-            payload.context?.[question.section as keyof MarketingContext]?.[question.field];
-          if (typeof existing === "string" && existing.trim()) {
-            prefill[question.id] = existing;
-          }
+        if (cancelled) return;
+        if (!response.ok) {
+          setProblem(payload.error ?? "Unable to load discovery questions.");
+          return;
         }
-        if (!cancelled && Object.keys(prefill).length) setAnswers(prefill);
+        const items = payload.questions ?? [];
+        setQuestions(items);
+        setSourcesUsed(payload.sourcesUsed ?? []);
+        const initial: Record<string, QuestionState> = {};
+        for (const q of items) {
+          if (q.alreadyConfirmed) continue;
+          initial[q.id] = {
+            value: q.suggestedValue || "",
+            action: "pending",
+          };
+        }
+        setStates(initial);
+        setLoaded(true);
       } catch {
-        // Prefill is a convenience; saving still merges server-side.
+        if (!cancelled) {
+          setProblem("Unable to load discovery questions. Continue manually.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryId]);
 
+  function updateState(id: string, next: QuestionState) {
+    setStates((current) => ({ ...current, [id]: next }));
+  }
+
   async function save() {
-    if (busy) return;
-    setBusy(true);
+    if (saving) return;
+    setSaving(true);
     setNote("");
     setProblem("");
     try {
-      const response = await fetch("/api/marketing-context", { cache: "no-store" });
-      const payload = (await response.json()) as {
-        context?: MarketingContext;
+      const answers = questions
+        .filter((q) => !q.alreadyConfirmed)
+        .map((q) => {
+          const st = states[q.id];
+          const action = st?.action === "pending"
+            ? (q.mode === "placeholder" ? "skip" : "accept")
+            : st?.action ?? "skip";
+          return {
+            questionId: q.id,
+            section: q.section,
+            field: q.field,
+            value: action === "reject" || action === "skip"
+              ? ""
+              : (st?.value ?? q.suggestedValue ?? "").trim(),
+            action,
+            source: q.source,
+          };
+        });
+      const response = await fetch("/api/brand-brain/discovery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categoryId, answers }),
+      });
+      const result = (await response.json()) as {
+        savedCount?: number;
+        rejectedCount?: number;
         error?: string;
       };
-      if (!response.ok) throw new Error(payload.error ?? "Unable to load context.");
-      const context = payload.context ?? {};
-      let saved = 0;
-      let skipped = 0;
-      const touched = new Set<string>();
-      for (const question of questions) {
-        const value = answers[question.id]?.trim() ?? "";
-        if (!value) continue;
-        const section = (context[question.section as keyof MarketingContext] ?? {}) as Record<
-          string,
-          unknown
-        >;
-        if (section._notApplicable === "true") {
-          skipped += 1;
-          continue;
-        }
-        const current = typeof section[question.field] === "string" ? (section[question.field] as string).trim() : "";
-        if (current) {
-          skipped += 1;
-          continue;
-        }
-        touched.add(question.section);
-      }
-      for (const sectionId of touched) {
-        const base = { ...((context[sectionId as keyof MarketingContext] ?? {}) as Record<string, unknown>) };
-        for (const question of questions.filter((entry) => entry.section === sectionId)) {
-          const value = answers[question.id]?.trim() ?? "";
-          if (value) base[question.field] = value;
-        }
-        const put = await fetch("/api/marketing-context", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sectionId, values: base }),
-        });
-        if (!put.ok) {
-          const failure = (await put.json()) as { error?: string };
-          throw new Error(failure.error ?? "Unable to save answers.");
-        }
-        saved += questions.filter((entry) => entry.section === sectionId).length;
-      }
+      if (!response.ok) throw new Error(result.error ?? "Unable to save answers.");
+      const saved = result.savedCount ?? 0;
+      const rejected = result.rejectedCount ?? 0;
+      const parts: string[] = [];
+      if (saved) parts.push(`${saved} answer${saved === 1 ? "" : "s"} saved to Brand Brain`);
+      if (rejected) parts.push(`${rejected} rejected`);
       setNote(
-        saved
-          ? `${saved} answer${saved === 1 ? "" : "s"} saved to Brand Brain${skipped ? ` (${skipped} already filled, kept as-is)` : ""}.`
-          : "Nothing new to save — answer a question above, or edit Brand Brain directly.",
+        parts.length
+          ? `${parts.join(", ")}.`
+          : "Nothing new to save — answer a question above or edit Brand Brain directly.",
       );
     } catch (saveError) {
       setProblem(saveError instanceof Error ? saveError.message : "Unable to save answers.");
     } finally {
-      setBusy(false);
+      setSaving(false);
     }
   }
 
-  if (!questions.length) return null;
+  if (loading) {
+    return (
+      <div className="ob-dx">
+        <p className="ob-dx-muted">Loading intelligent discovery questions…</p>
+      </div>
+    );
+  }
+
+  if (!questions.length && !problem) return null;
+
+  const confirmedCount = questions.filter((q) => q.alreadyConfirmed).length;
+  const activeQuestions = questions.filter((q) => !q.alreadyConfirmed);
 
   return (
     <div className="ob-dx">
       <h2 className="ob-subhead">Discovery questions</h2>
       <p className="ob-lead">
-        Answers save into empty Brand Brain fields only — your existing wording is
-        never overwritten.
+        {loaded && sourcesUsed.length > 0 && (
+          <>
+            Sources analyzed: {sourcesUsed.slice(0, 3).join(", ")}
+            {sourcesUsed.length > 3 && ` + ${sourcesUsed.length - 3} more`}.{" "}
+          </>
+        )}
+        Pre-filled answers are marked — review, edit, or reject each one.
+        {confirmedCount > 0 && (
+          <> <strong>{confirmedCount} field{confirmedCount === 1 ? "" : "s"}</strong> already confirmed.</>
+        )}
       </p>
-      {questions.map((question) => (
-        <label key={question.id} className="ob-dx-field">
-          <span>
-            {question.label}
-            <small>
-              → Brand Brain › {SECTION_TITLES[question.section] ?? question.section}
-            </small>
-          </span>
-          <textarea
-            rows={2}
-            value={answers[question.id] ?? ""}
-            placeholder={question.hint}
-            onChange={(event) =>
-              setAnswers((current) => ({ ...current, [question.id]: event.target.value }))
-            }
-          />
-        </label>
+      {confirmedCount > 0 && (
+        <details className="ob-dx-confirmed-section">
+          <summary className="ob-dx-muted">
+            Show {confirmedCount} confirmed field{confirmedCount === 1 ? "" : "s"}
+          </summary>
+          {questions
+            .filter((q) => q.alreadyConfirmed)
+            .map((q) => (
+              <DiscoveryQuestionCard
+                key={q.id}
+                question={q}
+                state={{ value: q.confirmedValue ?? "", action: "accept" }}
+                onChange={() => undefined}
+              />
+            ))}
+        </details>
+      )}
+      {activeQuestions.map((question) => (
+        <DiscoveryQuestionCard
+          key={question.id}
+          question={question}
+          state={states[question.id] ?? { value: "", action: "pending" }}
+          onChange={(next) => updateState(question.id, next)}
+        />
       ))}
       {note && (
         <p className="ob-dx-note" role="status">
@@ -499,9 +722,16 @@ export function DiscoveryQuestions({ categoryId }: { categoryId: string }) {
           {problem}
         </p>
       )}
-      <button type="button" className="ob-dx-button" disabled={busy} onClick={() => void save()}>
-        {busy ? "Saving…" : "Save answers to Brand Brain"}
-      </button>
+      {activeQuestions.length > 0 && (
+        <button
+          type="button"
+          className="ob-dx-button"
+          disabled={saving}
+          onClick={() => void save()}
+        >
+          {saving ? "Saving…" : "Save answers to Brand Brain"}
+        </button>
+      )}
     </div>
   );
 }

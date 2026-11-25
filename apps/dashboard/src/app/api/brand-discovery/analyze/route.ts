@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { classifyWebsite } from "@/lib/brand-discovery/classify";
-import { extractWebsiteFacts } from "@/lib/brand-discovery/extract";
-import {
-  getWebsiteAnalysis,
-  saveWebsiteAnalysis,
-} from "@/lib/brand-discovery/analysis-repository";
-import { fetchPublicHtml, PublicUrlError } from "@/lib/http/public-url";
-import { getOnboardingSession, saveOnboardingSession } from "@/lib/onboarding-repository";
+import { getWebsiteAnalysis } from "@/lib/brand-discovery/analysis-repository";
+import { brandBrainService } from "@/lib/brand-brain/service";
+import { PublicUrlError } from "@/lib/http/public-url";
+import { getOnboardingSession } from "@/lib/onboarding-repository";
 import {
   accessErrorResponse,
   requireWorkspaceAccess,
@@ -47,11 +43,14 @@ export async function POST(request: NextRequest) {
     const access = await requireWorkspaceAccess("member");
     const body = (await request.json().catch(() => null)) as {
       websiteUrl?: unknown;
+      businessName?: unknown;
     } | null;
-    const explicit =
+    const explicitUrl =
       typeof body?.websiteUrl === "string" ? body.websiteUrl.trim() : "";
+    const explicitName =
+      typeof body?.businessName === "string" ? body.businessName.trim() : "";
     const session = await getOnboardingSession(access.workspaceId);
-    const url = explicit || session?.websiteUrl || "";
+    const url = explicitUrl || session?.websiteUrl || "";
     if (!url || !/^https?:\/\/.+\..+/.test(url)) {
       return errorResponse("Enter a valid website URL starting with http(s)://.", 400);
     }
@@ -70,9 +69,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    let html: string;
     try {
-      ({ html } = await fetchPublicHtml(url));
+      const discovered = await brandBrainService.discoverExistingBrand({
+        brandId: access.workspaceId,
+        organizationId: access.organizationId,
+        websiteUrl: url,
+        businessName: explicitName || session?.businessName || null,
+      });
+      // Reusable completion: new website intelligence may fill gaps.
+      // Fire-and-forget so the analysis response stays fast (< Cohorio Intelligence + completion).
+      void brandBrainService
+        .runCompletion(access.workspaceId, {
+          organizationId: access.organizationId,
+          trigger: "evidence",
+        })
+        .catch(() => undefined);
+      return NextResponse.json(discovered);
     } catch (fetchError) {
       if (fetchError instanceof PublicUrlError) {
         return errorResponse(
@@ -82,28 +94,6 @@ export async function POST(request: NextRequest) {
       }
       throw fetchError;
     }
-    if (!html.trim()) {
-      return errorResponse("The website returned an empty page.", 502);
-    }
-
-    const classification = classifyWebsite({ url, html });
-    const facts = extractWebsiteFacts(html);
-    const analysis = await saveWebsiteAnalysis(access.workspaceId, {
-      url,
-      platform: classification.platform,
-      businessModel: classification.businessModel,
-      confidence: classification.confidence,
-      title: facts.title,
-      description: facts.description,
-      emails: facts.emails,
-      phones: facts.phones,
-      socials: facts.socials,
-      headings: facts.headings,
-      signals: classification.signals,
-    });
-    // Remember the URL for the onboarding session (merge-safe patch).
-    await saveOnboardingSession(access.workspaceId, { websiteUrl: url });
-    return NextResponse.json({ analysis });
   } catch (error) {
     const originResponse = originErrorResponse(error);
     if (originResponse) return originResponse;

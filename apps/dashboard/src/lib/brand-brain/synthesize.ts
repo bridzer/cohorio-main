@@ -27,6 +27,10 @@ export type SynthesisInput = {
     description?: string | null;
     platform?: string | null;
     url?: string | null;
+    targetAudiences?: string[];
+    positioning?: string | null;
+    voiceCharacteristics?: string[];
+    industry?: string | null;
   } | null;
   context: MarketingContext;
 };
@@ -85,6 +89,73 @@ export function synthesizeProposals(input: SynthesisInput): SynthesisProposal[] 
       source: "Website analysis",
       sourceType: "website",
       confidence: "medium",
+    });
+  }
+
+  const audiences = input.analysis?.targetAudiences?.filter(Boolean) ?? [];
+  if (audiences.length) {
+    // Evidence: website-extracted audience signals. Safe: quoted site content, not demographic inference.
+    // Generates a hypothesis for human approval; sensitive traits are never invented here.
+    const hypothesis = audiences.slice(0, 2).join("; ");
+    consider({
+      section: "targetAudience",
+      field: "primaryUseCase",
+      value: hypothesis,
+      source: "Website analysis",
+      sourceType: "website",
+      confidence: "low",
+    });
+    consider({
+      section: "targetAudience",
+      field: "targetCompanies",
+      value: hypothesis,
+      source: "Website analysis",
+      sourceType: "website",
+      confidence: "low",
+    });
+  }
+
+  const positioning = input.analysis?.positioning?.trim();
+  if (positioning) {
+    consider({
+      section: "differentiation",
+      field: "whyChoose",
+      value: positioning,
+      source: "Website analysis",
+      sourceType: "website",
+      confidence: "medium",
+    });
+    consider({
+      section: "differentiation",
+      field: "benefits",
+      value: positioning,
+      source: "Website analysis",
+      sourceType: "website",
+      confidence: "low",
+    });
+  }
+
+  const voice = input.analysis?.voiceCharacteristics?.slice(0, 3).join(", ").trim();
+  if (voice) {
+    consider({
+      section: "brandVoice",
+      field: "tone",
+      value: voice,
+      source: "Website analysis",
+      sourceType: "website",
+      confidence: "low",
+    });
+  }
+
+  const industry = input.analysis?.industry?.trim();
+  if (industry) {
+    consider({
+      section: "productOverview",
+      field: "category",
+      value: industry,
+      source: "Website analysis",
+      sourceType: "website",
+      confidence: "low",
     });
   }
 
