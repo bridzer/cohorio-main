@@ -93,7 +93,7 @@ describe("runBrandCompletion", () => {
       expect.objectContaining({ section: "productOverview", field: "whatItDoes" }),
     ]));
     expect(report.metrics.candidatesGenerated).toBe(1);
-    expect(report.metrics.proposalsCreated).toBe(1);
+    expect(report.metrics.provisionalSaved).toBe(1);
     expect(report.job.status === "REVIEW_REQUIRED" || report.job.status === "COMPLETED").toBe(true);
   });
 
@@ -129,7 +129,7 @@ describe("runBrandCompletion", () => {
     const report = await runBrandCompletion("ws-1");
     expect(mocks.proposeItems).toHaveBeenCalled();
     // proposeItems would internally skip if USER_CONFIRMED — completion reports whatever proposeItems returns
-    expect(typeof report.metrics.skipped).toBe("number");
+    expect(typeof report.metrics.skippedIdempotent).toBe("number");
   });
 
   it("marks failure without leaking sensitive inference as fact", async () => {
