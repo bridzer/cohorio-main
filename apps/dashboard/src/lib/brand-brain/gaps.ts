@@ -39,7 +39,6 @@ const WHY: Record<string, string> = {
   "targetAudience.targetCompanies": "Campaign targeting and audience suggestions are built from this.",
   "targetAudience.decisionMakers": "Messaging and ad angles address these roles directly.",
   "targetAudience.primaryUseCase": "Use cases anchor product stories and landing angles.",
-  "personas.stakeholders": "Multi-stakeholder deals need every voice mapped.",
   "personas.stakeholders": "Multi-stakeholder deals stall when a voice is unmapped.",
   "problems.coreProblem": "Pain-led copy outperforms feature lists — this is the fuel.",
   "problems.alternativesFallShort": "Differentiation angles come from where alternatives fail.",
