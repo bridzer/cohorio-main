@@ -135,7 +135,7 @@ export default function OnboardingWizard() {
           setProfile({ ...EMPTY_PROFILE, ...profilePayload.profile });
         }
         const nextSession = sessionPayload.session;
-        setSession(nextSession);
+        setSession(nextSession ?? null);
         setActiveStage(nextSession?.currentStage ?? "profile");
         setObjective(nextSession?.objective ?? "business");
         setBrandPath(nextSession?.brandPath ?? null);
