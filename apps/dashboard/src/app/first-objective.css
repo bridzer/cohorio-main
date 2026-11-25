@@ -1,0 +1,70 @@
+/* Dashboard banner for the workspace's chosen first objective. */
+
+.first-objective {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  border: 1px solid #dfe7ca;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #f5f9e9, #fcfdf8);
+  padding: 14px 18px;
+}
+
+.first-objective > div:first-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.first-objective span {
+  color: #60734a;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.first-objective strong {
+  color: #21302a;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+}
+
+.first-objective > div:last-child {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.first-objective button {
+  min-height: 38px;
+  border: 1px solid #275345;
+  border-radius: 9px;
+  background: #275345;
+  padding: 0 14px;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.first-objective button.ghost {
+  border-color: #d9dfd8;
+  background: #fff;
+  color: #365044;
+}
+
+@media (max-width: 620px) {
+  .first-objective {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .first-objective > div:last-child {
+    flex-direction: column;
+  }
+}

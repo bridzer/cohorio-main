@@ -128,12 +128,12 @@ export default function CampaignFieldSuggest({
           {brandBrainEmpty ? (
             <>
               No Brand Brain context yet.{" "}
-              <a href="/onboarding">Complete setup</a> to unlock suggestions.
+              <a href="/onboarding/brain">Complete setup</a> to unlock suggestions.
             </>
           ) : (
             <>
               Brand Brain doesn&apos;t cover this yet — add it in{" "}
-              <a href="/onboarding">Brand Brain setup</a>.
+              <a href="/onboarding/brain">Brand Brain setup</a>.
             </>
           )}
         </small>

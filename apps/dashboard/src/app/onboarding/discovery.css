@@ -1,0 +1,219 @@
+/* Milestone 2 discovery panels inside the onboarding wizard. */
+
+.ob-dx {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 6px;
+  border-top: 1px dashed var(--line, #e3e6df);
+  padding-top: 16px;
+}
+
+.ob-dx-button {
+  align-self: flex-start;
+  min-height: 40px;
+  border: 1px solid var(--forest, #173c31);
+  border-radius: 10px;
+  background: transparent;
+  padding: 0 16px;
+  color: var(--forest, #173c31);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.ob-dx-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.ob-dx-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--line, #e3e6df);
+  border-radius: 14px;
+  background: var(--panel, #fff);
+  padding: 16px;
+}
+
+.ob-dx-card strong {
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+
+.ob-dx-card p {
+  margin: 0;
+  color: #4d5b54;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ob-dx-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ob-dx-badge {
+  border-radius: 99px;
+  background: #eef3ea;
+  padding: 4px 10px;
+  color: #3d5248;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ob-dx-badge.tone-high {
+  background: #e4f1e7;
+  color: #2f6b48;
+}
+
+.ob-dx-badge.tone-low {
+  background: #f4f1e8;
+  color: #7a6420;
+}
+
+.ob-dx-muted {
+  color: var(--muted, #6c756f);
+  font-size: 12px;
+}
+
+.ob-dx-optional {
+  color: var(--muted, #6c756f);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ob-dx-error {
+  margin: 0;
+  border-radius: 10px;
+  background: #fce9e7;
+  padding: 12px 14px;
+  color: #9a4037;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ob-dx-note {
+  margin: 0;
+  border-radius: 10px;
+  background: #edf5e5;
+  padding: 12px 14px;
+  color: #426448;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ob-dx-upload {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 72px;
+  border: 1.5px dashed #9db3a4;
+  border-radius: 14px;
+  background: var(--panel, #fff);
+  padding: 16px;
+  cursor: pointer;
+}
+
+.ob-dx-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.ob-dx-upload span {
+  color: #3f694f;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ob-dx-assets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ob-dx-assets li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--line, #e3e6df);
+  border-radius: 12px;
+  background: var(--panel, #fff);
+  padding: 10px 12px;
+}
+
+.ob-dx-assets span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ob-dx-assets strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ob-dx-assets small {
+  color: var(--muted, #6c756f);
+  font-size: 12px;
+}
+
+.ob-dx-assets button {
+  flex: 0 0 auto;
+  border: 1px solid var(--line, #e3e6df);
+  border-radius: 8px;
+  background: transparent;
+  padding: 8px 12px;
+  color: #9a4037;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ob-dx-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #36433b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ob-dx-field small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted, #6c756f);
+  font-weight: 500;
+}
+
+.ob-dx-field textarea {
+  min-height: 56px;
+  border: 1px solid var(--line, #e3e6df);
+  border-radius: 10px;
+  background: var(--panel, #fff);
+  padding: 10px 13px;
+  color: var(--foreground, #18201d);
+  font: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.ob-dx-field textarea:focus-visible,
+.ob-dx-upload:focus-within {
+  outline: 2px solid var(--forest, #173c31);
+  outline-offset: 2px;
+}

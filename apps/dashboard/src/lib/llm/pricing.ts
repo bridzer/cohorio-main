@@ -48,8 +48,8 @@ export function modelCostUsd(
   if (!match) return null;
   const rate = rates[match];
   const cost =
-    (promptTokens * rate.input + completionTokens * rate.output) / 1_000_000;
-  return Math.round(cost * 1_000_000) / 1_000_000;
+    (promptTokens * rate.input + completionTokens * rate.output) / 1000000;
+  return Math.round(cost * 1000000) / 1000000;
 }
 
 /** The model id the active provider will call, for cost attribution. */

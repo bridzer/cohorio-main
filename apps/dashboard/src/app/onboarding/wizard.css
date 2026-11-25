@@ -1,0 +1,822 @@
+/* Milestone 1 onboarding wizard. Design language follows the Brand Brain
+   context form: forest ink, paper background, card borders, pill buttons. */
+
+.ob-loading {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: var(--background, #f5f6f2);
+  color: var(--muted, #6c756f);
+  font-size: 14px;
+}
+
+.ob-loading-mark {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--forest, #173c31);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 750;
+}
+
+.ob-shell {
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  background: var(--background, #f5f6f2);
+  color: var(--foreground, #18201d);
+}
+
+.ob-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  border-right: 1px solid var(--line, #e3e6df);
+  background: var(--panel, #fff);
+  padding: 28px 22px;
+}
+
+.ob-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.ob-brand-mark {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--forest, #173c31);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 750;
+}
+
+.ob-brand strong {
+  display: block;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+
+.ob-brand small {
+  display: block;
+  color: var(--muted, #6c756f);
+  font-size: 12px;
+}
+
+.ob-progress-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ob-progress-summary > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--muted, #6c756f);
+}
+
+.ob-progress-summary strong {
+  color: var(--foreground, #18201d);
+  font-size: 15px;
+}
+
+.ob-progress-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--line, #e3e6df);
+}
+
+.ob-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--forest, #173c31);
+  transition: width 200ms ease;
+}
+
+.ob-progress-summary p {
+  margin: 0;
+  color: var(--muted, #6c756f);
+  font-size: 12px;
+}
+
+.ob-save {
+  font-size: 12px;
+}
+
+.ob-save[data-state="saving"] {
+  color: #8a6d1a;
+}
+
+.ob-save[data-state="saved"] {
+  color: #3f6b52;
+}
+
+.ob-save[data-state="error"] {
+  color: #9a4037;
+}
+
+.ob-sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ob-sidebar nav button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  padding: 9px 10px;
+  color: var(--foreground, #18201d);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ob-sidebar nav button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.ob-sidebar nav button.active {
+  background: var(--background, #f5f6f2);
+  font-weight: 700;
+}
+
+.ob-sidebar nav button > span {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--line, #e3e6df);
+  color: var(--muted, #6c756f);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ob-sidebar nav button > span.complete {
+  background: var(--forest, #173c31);
+  color: #fff;
+}
+
+.ob-exit {
+  margin-top: auto;
+  border: 0;
+  background: transparent;
+  padding: 8px 0;
+  color: var(--muted, #6c756f);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ob-exit:hover {
+  color: var(--foreground, #18201d);
+}
+
+.ob-main {
+  max-width: 760px;
+  padding: 48px 40px 64px;
+}
+
+.ob-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ob-kicker {
+  color: var(--muted, #6c756f);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.ob-pane h1 {
+  margin: 0;
+  font-size: clamp(28px, 3.4vw, 40px);
+  font-weight: 560;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+.ob-lead {
+  margin: 0;
+  color: var(--muted, #6c756f);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.ob-lead a {
+  color: #3f694f;
+  font-weight: 700;
+}
+
+.ob-subhead {
+  margin: 10px 0 0;
+  font-size: 20px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+}
+
+.ob-pane > label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #36433b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ob-pane > label em {
+  color: var(--muted, #6c756f);
+  font-style: normal;
+  font-weight: 500;
+}
+
+.ob-pane input {
+  min-height: 44px;
+  border: 1px solid var(--line, #e3e6df);
+  border-radius: 10px;
+  background: var(--panel, #fff);
+  padding: 0 13px;
+  color: var(--foreground, #18201d);
+  font: inherit;
+  font-size: 15px;
+}
+
+.ob-pane input:focus-visible,
+.ob-cards button:focus-visible,
+.ob-actions button:focus-visible,
+.ob-geo button:focus-visible,
+.ob-notice button:focus-visible {
+  outline: 2px solid var(--forest, #173c31);
+  outline-offset: 2px;
+}
+
+.ob-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.ob-grid-2 label,
+.ob-grid-3 label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #36433b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ob-grid-2 label em {
+  color: var(--muted, #6c756f);
+  font-style: normal;
+  font-weight: 500;
+}
+
+.ob-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.ob-geo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ob-geo button {
+  border: 1px solid var(--line, #e3e6df);
+  border-radius: 99px;
+  background: var(--panel, #fff);
+  padding: 8px 14px;
+  color: #3f694f;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ob-geo button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.ob-geo small {
+  color: var(--muted, #6c756f);
+  font-size: 12px;
+}
+
+.ob-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.ob-cards > button {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1.5px solid var(--line, #e3e6df);
+  border-radius: 14px;
+  background: var(--panel, #fff);
+  padding: 18px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ob-cards > button:hover {
+  border-color: #9db3a4;
+}
+
+.ob-cards > button.selected {
+  border-color: #2f6f4f;
+  background: #f2f8f3;
+  box-shadow: 0 0 0 1px #2f6f4f;
+}
+
+.ob-cards strong {
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+
+.ob-cards span {
+  color: #4d5b54;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ob-cards small {
+  color: var(--muted, #6c756f);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ob-categories {
+  align-items: stretch;
+}
+
+.ob-notice {
+  border: 1px solid var(--line, #e3e6df);
+  border-radius: 14px;
+  background: var(--panel, #fff);
+  padding: 18px;
+}
+
+.ob-notice strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.ob-notice p {
+  margin: 0 0 12px;
+  color: #4d5b54;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ob-notice button {
+  border: 1px solid var(--forest, #173c31);
+  border-radius: 10px;
+  background: transparent;
+  padding: 10px 16px;
+  color: var(--forest, #173c31);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.ob-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  border-top: 1px solid var(--line, #e3e6df);
+  padding-top: 18px;
+}
+
+.ob-actions button {
+  min-height: 44px;
+  border: 1px solid var(--line, #e3e6df);
+  border-radius: 10px;
+  background: var(--panel, #fff);
+  padding: 0 18px;
+  color: var(--foreground, #18201d);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ob-actions button.primary {
+  border-color: var(--forest, #173c31);
+  background: var(--forest, #173c31);
+  color: #fff;
+}
+
+.ob-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.ob-error {
+  margin: 0;
+  border-radius: 10px;
+  background: #fce9e7;
+  padding: 12px 14px;
+  color: #9a4037;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .ob-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .ob-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--line, #e3e6df);
+    padding: 18px;
+  }
+
+  .ob-sidebar nav {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .ob-sidebar nav button {
+    flex: 0 0 auto;
+  }
+
+  .ob-exit {
+    margin-top: 0;
+  }
+
+  .ob-main {
+    padding: 24px 18px 48px;
+  }
+
+  .ob-cards,
+  .ob-grid-2,
+  .ob-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ob-channel-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ob-channel-group .ob-subhead {
+  margin: 6px 0 0;
+}
+
+.ob-channel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ob-channel > button {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  border: 1.5px solid var(--line, #e3e6df);
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+  background: var(--panel, #fff);
+  padding: 18px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ob-channel > button:hover {
+  border-color: #9db3a4;
+}
+
+.ob-channel > button.selected {
+  border-color: #2f6f4f;
+  background: #f2f8f3;
+  box-shadow: 0 -1px 0 1px #2f6f4f, -1px 0 0 1px #2f6f4f, 1px 0 0 1px #2f6f4f;
+}
+
+.ob-channel:not(:has(.ob-intent)) > button {
+  border-bottom: 1.5px solid var(--line, #e3e6df);
+  border-radius: 14px;
+}
+
+.ob-channel:not(:has(.ob-intent)) > button.selected {
+  box-shadow: 0 0 0 1px #2f6f4f;
+}
+
+.ob-channel-top {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ob-channel-top i {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #c3cbc2;
+}
+
+.ob-channel-top i.on {
+  background: #4d8a3a;
+}
+
+.ob-intent {
+  display: flex;
+  border: 1.5px solid #2f6f4f;
+  border-top: 1px solid var(--line, #e3e6df);
+  border-radius: 0 0 14px 14px;
+  overflow: hidden;
+  background: var(--panel, #fff);
+}
+
+.ob-intent button {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 9px 6px;
+  color: var(--muted, #6c756f);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ob-intent button.active {
+  background: #e4f0e6;
+  color: var(--forest, #173c31);
+}
+
+.ob-lead .ob-rec-pill,
+.ob-cards small.ob-rec {
+  color: #2f6b48;
+  font-weight: 700;
+}
+
+.ob-lead .ob-rec-pill {
+  border-radius: 99px;
+  background: #e4f1e7;
+  padding: 2px 9px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.ob-providers {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ob-providers li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid var(--line, #e3e6df);
+  border-radius: 14px;
+  background: var(--panel, #fff);
+  padding: 14px 16px;
+}
+
+.ob-providers li > i {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: #c3cbc2;
+}
+
+.ob-providers li > i.on {
+  background: #4d8a3a;
+}
+
+.ob-providers li > span {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ob-providers strong {
+  font-size: 15px;
+}
+
+.ob-providers small {
+  color: var(--muted, #6c756f);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ob-providers li > button {
+  flex: 0 0 auto;
+  min-height: 38px;
+  border: 1px solid var(--line, #e3e6df);
+  border-radius: 9px;
+  background: #fff;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ob-future {
+  flex: 0 0 auto;
+  border-radius: 99px;
+  background: #f4f1e8;
+  padding: 6px 10px;
+  color: #7a6420;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.ob-objectives {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ob-objective {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  border: 1.5px solid var(--line, #e3e6df);
+  border-radius: 14px;
+  background: var(--panel, #fff);
+  padding: 16px 18px;
+  cursor: pointer;
+}
+
+.ob-objective:hover {
+  border-color: #9db3a4;
+}
+
+.ob-objective.selected {
+  border-color: #2f6f4f;
+  background: #f2f8f3;
+  box-shadow: 0 0 0 1px #2f6f4f;
+}
+
+.ob-objective:focus-visible {
+  outline: 2px solid var(--forest, #173c31);
+  outline-offset: 2px;
+}
+
+.ob-objective-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ob-objective-top strong {
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+
+.ob-priority {
+  flex: 0 0 auto;
+  border-radius: 99px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.ob-priority.high {
+  background: #e4f1e7;
+  color: #2f6b48;
+}
+
+.ob-priority.medium {
+  background: #eef3ea;
+  color: #4d5b54;
+}
+
+.ob-priority.low {
+  background: #f1f0ed;
+  color: #7b7a76;
+}
+
+.ob-objective p {
+  margin: 0;
+  color: #4d5b54;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ob-objective-why {
+  font-weight: 600;
+  color: #33463d;
+}
+
+.ob-objective-outcome {
+  color: var(--muted, #6c756f);
+  font-size: 12px;
+}
+
+.ob-objective-reasons {
+  color: #2f6b48;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ob-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ob-chips em {
+  border-radius: 99px;
+  background: #eef3ea;
+  padding: 3px 9px;
+  color: #3d5248;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.ob-objective-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.ob-objective-foot small {
+  color: var(--muted, #6c756f);
+  font-size: 12px;
+}
+
+.ob-objective-foot button {
+  border: 1px solid #eadbd8;
+  border-radius: 8px;
+  background: #fff;
+  padding: 7px 11px;
+  color: #973f36;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ob-progress-track span {
+    transition: none;
+  }
+}

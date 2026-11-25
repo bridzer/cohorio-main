@@ -10,9 +10,9 @@ const EFFORTS: Effort[] = ["low", "medium", "high", "xhigh", "max"];
 // Server-side refusal fallback: a declined request is retried on the model
 // Anthropic recommends for that refusal category, inside the same call.
 const FALLBACK_BETA = "server-side-fallback-2026-07-01";
-const AGENT_TIMEOUT_MS = 5 * 60_000;
+const AGENT_TIMEOUT_MS = 5 * 60000;
 // Thinking counts toward max_tokens, so leave room for it as well as the reply.
-const MAX_TOKENS = 16_000;
+const MAX_TOKENS = 16000;
 
 let cached: { key: string; client: Anthropic } | null = null;
 

@@ -12,6 +12,7 @@ const MAX_REDIRECTS = 3;
 const FETCH_TIMEOUT_MS = 10_000;
 const MAX_BYTES = 100_000;
 const MAX_TEXT = 8_000;
+const MAX_HTML_BYTES = 300_000;
 
 export class PublicUrlError extends Error {
   constructor() {
@@ -168,5 +169,45 @@ export async function fetchPublicText(
     const type = response.headers.get("content-type") ?? "";
     const text = type.includes("html") ? htmlToText(raw) : raw.trim();
     return text.slice(0, MAX_TEXT);
+  }
+}
+
+/**
+ * Raw-HTML sibling of fetchPublicText for page analysis (brand discovery).
+ * Same SSRF discipline: every hop re-validated, manual redirects, hard caps.
+ * Rejects non-HTML content so binary downloads never enter the pipeline.
+ */
+export async function fetchPublicHtml(
+  url: string,
+  options: { lookup?: LookupAll; fetchImpl?: typeof fetch } = {},
+): Promise<{ html: string; finalUrl: string }> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const signal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
+  let target = await assertPublicHttpUrl(url, options.lookup);
+  for (let redirects = 0; ; redirects += 1) {
+    const response = await fetchImpl(target, {
+      redirect: "manual",
+      signal,
+      headers: { Accept: "text/html,application/xhtml+xml" },
+    });
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location || redirects >= MAX_REDIRECTS) {
+        throw new PublicUrlError();
+      }
+      target = await assertPublicHttpUrl(
+        new URL(location, target).toString(),
+        options.lookup,
+      );
+      continue;
+    }
+    if (!response.ok) {
+      throw new Error(`That page returned HTTP ${response.status}.`);
+    }
+    const type = response.headers.get("content-type") ?? "";
+    if (type && !type.includes("html") && !type.includes("text")) {
+      throw new PublicUrlError();
+    }
+    return { html: await readCapped(response, MAX_HTML_BYTES), finalUrl: target.toString() };
   }
 }

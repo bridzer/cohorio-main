@@ -3,6 +3,7 @@ import {
   getMarketingContext,
   saveMarketingContextSection,
 } from "@/lib/marketing-context-repository";
+import { markFieldsUserConfirmed } from "@/lib/brand-brain/provenance";
 import {
   CONTEXT_SECTIONS,
   contextProgress,
@@ -116,6 +117,17 @@ export async function PUT(request: NextRequest) {
       body.sectionId,
       values,
     );
+    // Best-effort trust stamp: the save already succeeded, so a provenance
+    // failure must not fail the request — it only affects review display.
+    markFieldsUserConfirmed(
+      workspaceId,
+      body.sectionId,
+      Object.entries(values)
+        .filter(([key, value]) => key !== "_notApplicable" && value.trim())
+        .map(([key]) => key),
+    ).catch((stampError: unknown) => {
+      console.error("Brand Brain provenance stamp failed.", stampError);
+    });
     const progress = contextProgress(stored.sections);
     return NextResponse.json({
       context: stored.sections,

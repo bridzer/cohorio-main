@@ -9,6 +9,7 @@ import {
 } from "@/lib/workspaces";
 import { useRouter } from "next/navigation";
 import { PENDING_PROMPT_KEY } from "@/lib/agent-ui/handoff";
+import FirstObjectiveBanner from "./FirstObjectiveBanner";
 
 type IconName =
   | "spark"
@@ -544,7 +545,7 @@ export default function Home() {
             <span style={{ width: `${brandBrainProgress}%` }} />
           </div>
           <p>Complete your context so every output sounds like you.</p>
-          <button onClick={() => router.push("/onboarding")}>
+          <button onClick={() => router.push("/onboarding/brain")}>
             {brandBrainProgress ? "Continue setup" : "Start setup"}{" "}
             <Icon name="arrow" size={15} />
           </button>
@@ -673,6 +674,8 @@ export default function Home() {
               <p>Your marketing workspace is ready. What will you move forward today?</p>
             </div>
           </section>
+
+          <FirstObjectiveBanner />
 
           <section className="copilot-card">
             <div className="copilot-glow" />
@@ -812,65 +815,7 @@ export default function Home() {
               </div>
             ) : null}
           </section>
-
-          <section className="bottom-grid">
-            <div className="activity-panel">
-              <div className="panel-heading">
-                <div>
-                  <h2>Recent work</h2>
-                  <p>Pick up where you left off.</p>
-                </div>
-              </div>
-              {assets.length === 0 ? (
-                <p className="activity-empty">No saved assets.</p>
-              ) : (
-                <div className="activity-list">
-                  {assets.slice(0, 6).map((asset) => (
-                    <button
-                      className="activity-row"
-                      key={`${asset.type}:${asset.id}`}
-                      type="button"
-                      onClick={() => router.push(asset.href)}
-                    >
-                      <span className="activity-copy">
-                        <strong>{asset.title}</strong>
-                        <span>
-                          {ASSET_LABEL[asset.type]} ·{" "}
-                          {new Intl.DateTimeFormat("en-US", {
-                            dateStyle: "medium",
-                            timeStyle: "short",
-                          }).format(new Date(asset.createdAt))}
-                        </span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="connections-panel">
-              <div className="panel-heading">
-                <div>
-                  <h2>Connected stack</h2>
-                  <p>Shopify and team access for this workspace.</p>
-                </div>
-              </div>
-              <div className="connection-links">
-                <button
-                  className="manage-button"
-                  onClick={() => router.push("/commerce")}
-                >
-                  Shopify stores <Icon name="arrow" size={16} />
-                </button>
-                <button
-                  className="manage-button"
-                  onClick={() => router.push("/settings")}
-                >
-                  Team members <Icon name="arrow" size={16} />
-                </button>
-              </div>
-            </div>
-          </section>
+         
             </>
           )}
         </div>
