@@ -19,6 +19,7 @@ export const SKILL_CATEGORY: Record<string, SkillCategory> = {
   form: "Conversion Optimization",
   popups: "Conversion Optimization",
   paywalls: "Conversion Optimization",
+  "store-audit": "Conversion Optimization",
   copywriting: "Content & Copy",
   "copy-editing": "Content & Copy",
   "cold-email": "Content & Copy",

@@ -53,6 +53,13 @@ vi.mock("@/lib/billing/quota", async () => {
         : null,
   };
 });
+vi.mock("@/lib/billing/budget", async () => {
+  const { NextResponse } = await import("next/server");
+  return {
+    assertAgentBudget: vi.fn(async () => ({ plan: "free", spentUsd: 0, budgetUsd: 100 })),
+    budgetErrorResponse: () => null,
+  };
+});
 
 import { POST } from "@/app/api/agent/runs/route";
 import { readEventStream } from "@/lib/agent-ui/sse";

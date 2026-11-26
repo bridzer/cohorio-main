@@ -64,11 +64,17 @@ export async function PUT(request: NextRequest) {
     );
   }
 
+  let access: { workspaceId: string; organizationId: string; userId: string } | null = null;
   let workspaceId = "";
   let payload: unknown;
   try {
     assertSameOrigin(request);
-    workspaceId = (await requireWorkspaceAccess("member")).workspaceId;
+    access = (await requireWorkspaceAccess("member")) as {
+      workspaceId: string;
+      organizationId: string;
+      userId: string;
+    };
+    workspaceId = access.workspaceId;
     payload = await request.json();
   } catch (error) {
     const originResponse = originErrorResponse(error);
@@ -112,6 +118,12 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
+    // Capture pre-save snapshot for learning event diff (correction detection)
+    const beforeCtx = await getMarketingContext(workspaceId);
+    const beforeSection = beforeCtx?.sections[body.sectionId as keyof typeof beforeCtx.sections] as
+      | Record<string, string>
+      | undefined;
+
     const stored = await saveMarketingContextSection(
       workspaceId,
       body.sectionId,
@@ -128,6 +140,32 @@ export async function PUT(request: NextRequest) {
     ).catch((stampError: unknown) => {
       console.error("Brand Brain provenance stamp failed.", stampError);
     });
+
+    // Best-effort Learning Loop: capture brand knowledge approved/corrected
+    // (§3.A, §12 Step 1-2). Never blocks the happy path; idempotent via dedup.
+    if (access) {
+      const afterSection = stored.sections[body.sectionId as keyof typeof stored.sections] as
+        | Record<string, string>
+        | undefined;
+      const isCorrection = Boolean(beforeSection && Object.keys(beforeSection).some((k) => beforeSection[k]?.trim() && afterSection?.[k]?.trim() && beforeSection[k] !== afterSection?.[k]));
+      const { brandBrainLearningService } = await import("@/lib/brand-brain/learning/service");
+      brandBrainLearningService
+        .captureEvent(
+          { organizationId: access.organizationId, workspaceId, userId: access.userId },
+          {
+            eventType: isCorrection ? "brand_knowledge_corrected" : "brand_knowledge_approved",
+            sourceModule: "marketing-context",
+            entityType: "brand_section",
+            entityId: body.sectionId,
+            originalValue: beforeSection ?? null,
+            resultingValue: values,
+            feedback: { action: isCorrection ? "corrected" : "approved", reason: `${body.sectionId} ${isCorrection ? "corrected" : "saved"}` },
+            context: { sectionId: body.sectionId, progress: contextProgress(stored.sections).percentage },
+          },
+        )
+        .catch((e: unknown) => console.error("Learning event capture failed (marketing-context)", e));
+    }
+
     const progress = contextProgress(stored.sections);
     return NextResponse.json({
       context: stored.sections,

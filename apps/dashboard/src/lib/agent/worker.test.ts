@@ -30,6 +30,10 @@ vi.mock("@/lib/billing/quota", async () => {
   class TaskQuotaError extends Error {}
   return { assertTaskQuota: mocks.quota, recordTaskEvent: mocks.record, TaskQuotaError };
 });
+vi.mock("@/lib/billing/budget", async () => {
+  class AgentBudgetError extends Error { constructor() { super("budget"); this.name = "AGENT_BUDGET_EXCEEDED"; } }
+  return { assertAgentBudget: vi.fn(async () => ({ plan: "free", spentUsd: 0, budgetUsd: 100 })), getAgentSpend: vi.fn(async () => ({ plan: "free", spentUsd: 0, budgetUsd: 100 })), AgentBudgetError };
+});
 vi.mock("./jobs", () => ({
   enqueueJob: mocks.enqueueJob,
   claimNextJob: mocks.claim,

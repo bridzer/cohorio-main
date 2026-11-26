@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { workspaceContextMarkdown } from "@/lib/marketing-context-prompt";
 import { completeChat } from "@/lib/llm/client";
 import { readSkillMarkdown } from "@/lib/skills/load-skill";
 import {
@@ -62,7 +61,8 @@ export async function POST(request: NextRequest) {
 
   try {
     assertSameOrigin(request);
-    const workspaceId = (await requireWorkspaceAccess("member")).workspaceId;
+    const access = await requireWorkspaceAccess("member");
+    const workspaceId = access.workspaceId;
     const payload = await request.json();
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
       return errorResponse("Request body must be valid JSON.", 400);
@@ -94,9 +94,26 @@ export async function POST(request: NextRequest) {
     }
     const platforms = requestedPlatforms(body);
     await assertTaskQuota(workspaceId);
-    const [skillMarkdown, brandMarkdown] = await Promise.all([
+    const { getMarketingContext } = await import("@/lib/marketing-context-repository");
+    const { contextToMarkdown } = await import("@/lib/marketing-context");
+    const stored = await getMarketingContext(workspaceId);
+    const brandMarkdown = stored ? contextToMarkdown(stored.sections, stored.updatedAt) : "No Brand Brain context saved.";
+    const [skillMarkdown, adaptive] = await Promise.all([
       readSkillMarkdown("social"),
-      workspaceContextMarkdown(workspaceId),
+      import("@/lib/brand-brain/learning/context-engine").then((m) =>
+        m.buildAdaptiveContext({
+          workspaceId,
+          organizationId: access.organizationId,
+          taskContext: {
+            taskType: "social_content",
+            channel: platforms.join(","),
+            contentType: "social_post",
+            query: body.source as string,
+            currentUserId: access.userId,
+          },
+          prefetchedStored: stored as unknown as { sections: import("@/lib/marketing-context").MarketingContext; updatedAt: string } | null,
+        }),
+      ).catch(() => null),
     ]);
     const drafts: Partial<Record<SocialPlatform, string>> = {};
     const saved: SocialPost[] = [];
@@ -104,7 +121,7 @@ export async function POST(request: NextRequest) {
       const output = await completeChat([
         {
           role: "system",
-          content: `${skillMarkdown}\n\n${brandMarkdown}\n\nWrite one ${platform} post. Return only the post text.`,
+          content: `${skillMarkdown}\n\n${brandMarkdown}${adaptive?.promptBlock ? `\n\n${adaptive.promptBlock}` : ""}\n\nWrite one ${platform} post. Return only the post text.`,
         },
         {
           role: "user",
@@ -126,7 +143,39 @@ export async function POST(request: NextRequest) {
       );
     }
     await recordTaskEvent(workspaceId, "social");
-    return NextResponse.json({ posts: drafts, saved });
+    // Learning Loop: evaluate outputs before presenting (§8) and capture generation events.
+    // Best-effort, never blocks response; output evaluations include brand voice scoring.
+    for (const platform of platforms) {
+      const text = drafts[platform];
+      if (!text) continue;
+      const { brandBrainLearningService } = await import("@/lib/brand-brain/learning/service");
+      const entityId = saved.find((s) => s.platform === platform)?.id ?? null;
+      brandBrainLearningService
+        .captureEvent(
+          { organizationId: access.organizationId, workspaceId, userId: access.userId },
+          {
+            eventType: "output_generated",
+            sourceModule: "social/generate",
+            entityType: "social_post",
+            entityId: entityId ?? platform,
+            resultingValue: text,
+            context: { platform, goal: body.goal, voice: body.voice, adaptiveApplied: Boolean(adaptive?.promptBlock) },
+          },
+        )
+        .catch((e: unknown) => console.error("Learning capture failed social/generate", e));
+      brandBrainLearningService
+        .evaluateOutput({
+          organizationId: access.organizationId,
+          workspaceId,
+          entityType: "social_post",
+          entityId: entityId ?? platform,
+          outputType: `social:${platform}`,
+          originalOutput: text,
+          brandContextMarkdown: brandMarkdown,
+        })
+        .catch((e: unknown) => console.error("Output evaluation failed social/generate", e));
+    }
+    return NextResponse.json({ posts: drafts, saved, adaptive: adaptive ? { applied: Boolean(adaptive.promptBlock), preferencesCount: (adaptive.preferences?.length ?? 0) } : null });
   } catch (error) {
     const originResponse = originErrorResponse(error);
     if (originResponse) return originResponse;

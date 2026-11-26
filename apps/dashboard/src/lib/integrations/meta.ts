@@ -26,7 +26,7 @@ export function metaOAuthConfigured() {
 }
 
 export function metaRedirectUri() {
-  const appUrl = (process.env.APP_URL ?? process.env.AUTH_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const appUrl = (process.env.APP_URL?.trim() || process.env.AUTH_URL?.trim() || "http://localhost:3000").replace(/\/$/, "");
   return `${appUrl}/api/integrations/meta-ads/oauth/callback`;
 }
 

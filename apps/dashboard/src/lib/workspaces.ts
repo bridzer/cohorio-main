@@ -562,7 +562,13 @@ export const FEATURE_WORKSPACES: WorkspaceDefinition[] = [
             required: true,
           },
           goal("The click or conversion"),
-          situation("Proof and claims you can use"),
+          {
+            id: "situation",
+            label: "What is happening now",
+            placeholder: "Proof and claims you can use",
+            required: false,
+            multiline: true,
+          },
         ],
       },
       {

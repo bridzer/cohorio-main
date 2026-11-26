@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { workspaceContextMarkdown } from "@/lib/marketing-context-prompt";
 import { insertCopilotRun } from "@/lib/copilot-repository";
 import { completeChat } from "@/lib/llm/client";
 import { brandBrainMessages } from "@/lib/brand-brain-messages";
@@ -85,13 +84,40 @@ export async function POST(request: NextRequest) {
     }
     const skillDirectory = skillForJob(match.workspace.id, match.job.id);
     await assertTaskQuota(access.workspaceId);
-    const [skillMarkdown, brandMarkdown] = await Promise.all([
+    const { getMarketingContext } = await import("@/lib/marketing-context-repository");
+    const { contextToMarkdown } = await import("@/lib/marketing-context");
+    const stored = await getMarketingContext(access.workspaceId);
+    const brandMarkdown = stored
+      ? contextToMarkdown(stored.sections, stored.updatedAt)
+      : "No Brand Brain context saved.";
+    const [skillMarkdown, adaptive] = await Promise.all([
       readSkillMarkdown(skillDirectory),
-      workspaceContextMarkdown(access.workspaceId),
+      import("@/lib/brand-brain/learning/context-engine").then((m) =>
+        m.buildAdaptiveContext({
+          workspaceId: access.workspaceId,
+          organizationId: access.organizationId,
+          taskContext: {
+            taskType: `${match.workspace.id}:${match.job.id}`,
+            contentType: match.workspace.id,
+            query: prompt.slice(0, 800),
+            currentUserId: access.userId,
+          },
+          prefetchedStored: stored as unknown as { sections: import("@/lib/marketing-context").MarketingContext; updatedAt: string } | null,
+        }),
+      ).catch(() => null),
     ]);
-    const output = await completeChat(
-      brandBrainMessages({ skillMarkdown, brandMarkdown, prompt }),
-    );
+    const messages = brandBrainMessages({ skillMarkdown, brandMarkdown, prompt });
+    // Inject adaptive preferences into the first user message (Brand Brain context) when present
+    if (adaptive?.promptBlock) {
+      const lastIdx = messages.length - 1;
+      if (messages[lastIdx]) {
+        messages[lastIdx] = {
+          ...messages[lastIdx]!,
+          content: `${messages[lastIdx]!.content}\n\n${adaptive.promptBlock}`,
+        };
+      }
+    }
+    const output = await completeChat(messages);
     const run = await insertCopilotRun({
       workspaceId: access.workspaceId,
       userId: access.userId,
@@ -100,6 +126,34 @@ export async function POST(request: NextRequest) {
       output,
     });
     await recordTaskEvent(access.workspaceId, "copilot");
+    // Learning Loop: capture output generation (§3.B) and run internal evaluation (§8) — best-effort, non-blocking
+    {
+      const { brandBrainLearningService } = await import("@/lib/brand-brain/learning/service");
+      brandBrainLearningService
+        .captureEvent(
+          { organizationId: access.organizationId, workspaceId: access.workspaceId, userId: access.userId },
+          {
+            eventType: "output_generated",
+            sourceModule: `workspace:${match.workspace.id}:${match.job.id}`,
+            entityType: "copilot_run",
+            entityId: run.id,
+            resultingValue: output.slice(0, 6000),
+            context: { workspaceId: match.workspace.id, jobId: match.job.id, adaptiveApplied: Boolean(adaptive?.promptBlock) },
+          },
+        )
+        .catch((e: unknown) => console.error("Learning capture workspace/run", e));
+      brandBrainLearningService
+        .evaluateOutput({
+          organizationId: access.organizationId,
+          workspaceId: access.workspaceId,
+          entityType: "copilot_run",
+          entityId: run.id,
+          outputType: `copilot:${skillDirectory}`,
+          originalOutput: output,
+          brandContextMarkdown: brandMarkdown,
+        })
+        .catch((e: unknown) => console.error("Learning evaluate workspace/run", e));
+    }
     // Audit jobs continue in chat: the response carries the first message of
     // a new agent conversation (request + report), which the client hands to
     // /agent the moment the run completes.

@@ -550,6 +550,27 @@ export default function Home() {
             {brandBrainProgress ? "Continue setup" : "Start setup"}{" "}
             <Icon name="arrow" size={15} />
           </button>
+          <button
+            onClick={() => router.push("/brand-brain/learning")}
+            style={{
+              marginTop: 10,
+              width: "100%",
+              padding: "8px 12px",
+              borderRadius: 999,
+              border: "1px solid #e5e7eb",
+              background: "#fff",
+              color: "#374151",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+            }}
+          >
+            Learning Insights →
+          </button>
         </div>
 
         <button

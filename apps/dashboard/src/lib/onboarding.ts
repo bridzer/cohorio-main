@@ -194,6 +194,7 @@ export function channelSelections(value: unknown): ChannelSelection[] {
       entry &&
       typeof entry === "object" &&
       typeof (entry as { id?: unknown }).id === "string" &&
+      (entry as { id: string }).id.trim() &&
       ((entry as { intent?: unknown }).intent === "using" ||
         (entry as { intent?: unknown }).intent === "planning")
     ) {

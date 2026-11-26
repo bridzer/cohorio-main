@@ -507,7 +507,8 @@ export function markdownSectionHasProvidedValues(
       const value = lines[next]?.trim() ?? "";
       if (!value) continue;
       if (value.startsWith("**") && value.endsWith(":**")) break;
-      return value !== "_Not provided_";
+      if (value !== "_Not provided_") return true;
+      break;
     }
   }
   return false;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { updateSocialPost, type SocialPostStatus } from "@/lib/social/repository";
+import { getSocialPost, updateSocialPost, type SocialPostStatus } from "@/lib/social/repository";
 import {
   accessErrorResponse,
   requireWorkspaceAccess,
@@ -27,7 +27,8 @@ export async function PATCH(
   }
   try {
     assertSameOrigin(request);
-    const workspaceId = (await requireWorkspaceAccess("member")).workspaceId;
+    const access = await requireWorkspaceAccess("member");
+    const workspaceId = access.workspaceId;
     const id = (await context.params).id;
     if (
       !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -62,6 +63,15 @@ export async function PATCH(
     )) {
       return errorResponse("Post text must contain 1 to 20,000 characters.", 400);
     }
+    let previousBody: string | null = null;
+    if (typeof body.body === "string") {
+      try {
+        const prev = await getSocialPost(workspaceId, id);
+        previousBody = prev?.body ?? null;
+      } catch {
+        previousBody = null;
+      }
+    }
     const post = await updateSocialPost(workspaceId, id, {
       status: body.status as SocialPostStatus,
       scheduledFor,
@@ -69,6 +79,22 @@ export async function PATCH(
     });
     if (!post) {
       return errorResponse("Post not found.", 404);
+    }
+    if (typeof body.body === "string" && previousBody != null && previousBody !== body.body.trim()) {
+      const { brandBrainLearningService } = await import("@/lib/brand-brain/learning/service");
+      brandBrainLearningService
+        .evaluateAndMaybeLearnFromEdit({
+          organizationId: access.organizationId,
+          workspaceId,
+          userId: access.userId,
+          sourceModule: "social/posts",
+          entityType: "social_post",
+          entityId: id,
+          originalOutput: previousBody,
+          finalOutput: body.body.trim(),
+          outputType: "social:post",
+        })
+        .catch((e: unknown) => console.error("Learning edit social post", e));
     }
     return NextResponse.json({ post });
   } catch (error) {
